@@ -1,0 +1,46 @@
+# Archivo: /taskflow-backend/.gitignore
+
+# Laravel
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+docker-compose.override.yml
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+
+# Entornos específicos - NO COMMITEAR
+.env.local
+.env.production
+.env.staging
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+/mysql-data
+/redis-data
+
+# Logs
+*.log
+storage/logs/*.log
+
+# SSL Certificates (producción)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt

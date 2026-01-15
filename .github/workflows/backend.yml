@@ -1,0 +1,53 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'taskflow-backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'taskflow-backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch: # Permite ejecución manual desde GitHub UI
+
+jobs:
+  laravel-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./taskflow-backend
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: taskflow_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        extensions: mbstring, dom, fileinfo, mysql, pdo_mysql
+        coverage: none
+
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+    - name: Generate Application Key
+      run: php artisan key:generate
+
+    - name: Check PHP Syntax (Lint)
+      run: find app routes config -name "*.php" -print0 | xargs -0 -n1 php -l

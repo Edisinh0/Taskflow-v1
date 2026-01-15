@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # FRONTEND (Vue.js + Nginx interno)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ../taskflow-frontend
+      dockerfile: Dockerfile
+    container_name: taskflow_frontend_new
+    restart: unless-stopped
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # BACKEND (Laravel + PHP-FPM)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_backend_new
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./public:/var/www/html/public
+    depends_on:
+      - db
+      - redis
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # WORKER (Laravel Queue)
+  # ---------------------------------------------------------------------------
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_queue_new
+    command: php artisan queue:work --sleep=3 --tries=3
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - redis
+      - db
+    volumes:
+      - ./storage:/var/www/html/storage
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # GATEWAY (Nginx Principal - Unifica Front y Back)
+  # ---------------------------------------------------------------------------
+  gateway:
+    image: nginx:alpine
+    container_name: taskflow_gateway_new
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # - "443:443" # Descomentar cuando configures SSL
+    volumes:
+      - ./nginx-gateway/conf.d:/etc/nginx/conf.d
+      - ${PWD}/public:/var/www/backend/public # Para servir assets del back si fuera necesario
+      - ${PWD}/storage/app/public:/var/www/backend/public/storage # Montar storage directamente
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # BASE DE DATOS
+  # ---------------------------------------------------------------------------
+  db:
+    image: mariadb:10.11
+    container_name: taskflow_db_new
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: taskflow_root_pass
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # CACHE
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:alpine
+    container_name: taskflow_redis_new
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - taskflow_net
+
+  # ---------------------------------------------------------------------------
+  # WEBSOCKETS (Soketi)
+  # ---------------------------------------------------------------------------
+  soketi:
+    image: quay.io/soketi/soketi:latest-16-alpine
+    container_name: taskflow_soketi_new
+    restart: unless-stopped
+    ports:
+      - "6001:6001"
+    environment:
+      SOKETI_DEBUG: "1"
+      SOKETI_DEFAULT_APP_ID: "taskflow-app"
+      SOKETI_DEFAULT_APP_KEY: "taskflow-key"
+      SOKETI_DEFAULT_APP_SECRET: "taskflow-secret"
+    networks:
+      - taskflow_net
+
+networks:
+  taskflow_net:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:

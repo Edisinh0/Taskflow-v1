@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-200 antialiased transition-colors duration-300;
+}
+
+::selection {
+  @apply bg-blue-500/30 text-blue-200;
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+  background: #f3f4f6;
+  border: 2px dashed #3b82f6;
+}
+
+.sortable-drag {
+  opacity: 0.8;
+  cursor: move;
+}
+
+.drag-handle {
+  cursor: move;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  color: #3b82f6;
+}

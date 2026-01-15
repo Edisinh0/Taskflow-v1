@@ -1,0 +1,57 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch: # Ejecución manual
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # 1. Ir al directorio del proyecto (o crearlo si no existe)
+            if [ ! -d "Taskflow-Icontel" ]; then
+              git clone https://github.com/Edisinh0/Taskflow-Icontel.git
+            fi
+            
+            cd Taskflow-Icontel
+            
+            # 2. Actualizar código
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # 3. Configurar variables de entorno si no existen
+            if [ ! -f "taskflow-backend/.env" ]; then
+                cp taskflow-backend/.env.example taskflow-backend/.env
+                echo "⚠ IMPORTANTE: Debes configurar taskflow-backend/.env manualmente en el servidor"
+            fi
+            
+            # 4. Asegurar permisos de storage (clave para Laravel)
+            mkdir -p taskflow-backend/storage/framework/{sessions,views,cache}
+            mkdir -p taskflow-backend/storage/logs
+            chmod -R 777 taskflow-backend/storage taskflow-backend/bootstrap/cache
+
+            # 5. Desplegar con Docker Compose Producción
+            docker compose -f docker-compose.prod.yml down --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --build
+            
+            # 6. Ejecutar comandos post-deploy en el Backend
+            echo "Ejecutando migraciones y optimizaciones..."
+            docker compose -f docker-compose.prod.yml exec -T backend php artisan migrate --force
+            docker compose -f docker-compose.prod.yml exec -T backend php artisan config:cache
+            docker compose -f docker-compose.prod.yml exec -T backend php artisan route:cache
+            docker compose -f docker-compose.prod.yml exec -T backend php artisan view:cache
+            docker compose -f docker-compose.prod.yml exec -T backend php artisan storage:link || true
+            
+            echo "🚀 Despliegue finalizado exitosamente"
