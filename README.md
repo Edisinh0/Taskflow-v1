@@ -3,12 +3,14 @@
 <div align="center">
 
 ![Taskflow Banner](https://img.shields.io/badge/Taskflow-Sistema_de_Gestión-blue?style=for-the-badge)
-[![Laravel](https://img.shields.io/badge/Laravel-11.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
-[![Vue.js](https://img.shields.io/badge/Vue.js-3.x-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org)
+[![Laravel](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
 
 **Sistema completo de gestión de flujos de trabajo y tareas para empresas**
 
-[Características](#-características-principales) • [Instalación](#-instalación) • [Uso](#-uso) • [Tecnologías](#-tecnologías) • [Contribuir](#-contribuir)
+[Características](#-características-principales) • [Instalación](#-instalación) • [Uso](#-uso) • [Tecnologías](#-tecnologías) • [Documentación](#-documentación)
 
 </div>
 
@@ -93,48 +95,82 @@ Facilitar la gestión de proyectos complejos mediante:
 ## 🛠️ Tecnologías
 
 ### Backend
-- **Laravel 11.x** - Framework PHP
+- **Laravel 12.x** - Framework PHP moderno
+- **PHP 8.2+** - Lenguaje de programación
 - **MySQL** - Base de datos relacional
-- **JWT Auth** - Autenticación con tokens
-- **Laravel Sanctum** - API authentication
+- **Laravel Sanctum 4.x** - Autenticación API
 - **Eloquent ORM** - Manejo de base de datos
 - **Laravel Observers** - Lógica de eventos automáticos
+- **Laravel Auditing** - Registro de cambios
+- **DomPDF** - Generación de PDFs
 
 ### Frontend
-- **Vue.js 3** - Framework JavaScript progresivo
-- **Vue Router** - Navegación SPA
-- **Pinia** - State management
-- **Axios** - Cliente HTTP
-- **Chart.js** - Gráficos interactivos
-- **Tailwind CSS** - Framework de estilos
-- **Vite** - Build tool
+- **Vue.js 3.5** - Framework JavaScript progresivo
+- **Vue Router 4.x** - Navegación SPA
+- **Pinia 3.x** - State management moderno
+- **Axios 1.13** - Cliente HTTP
+- **Chart.js 4.5** - Gráficos interactivos
+- **Vue Flow** - Diagramas de flujo interactivos
+- **Tailwind CSS 3.4** - Framework de estilos
+- **Vite 7.x** - Build tool rápido y moderno
+- **SweetAlert2** - Alertas y modales elegantes
+- **Lucide Icons** - Iconografía moderna
+- **HeadlessUI** - Componentes accesibles
+- **Socket.io** - Comunicación en tiempo real
+- **Pusher/Laravel Echo** - Broadcasting de eventos
 
-### DevOps
+### DevOps & Herramientas
 - **Docker** - Contenedorización
 - **Docker Compose** - Orquestación de servicios
+- **GitHub Actions** - CI/CD automatizado
+- **ESLint & Prettier** - Linting y formateo de código
+- **Laravel Pint** - Code style fixer para PHP
 - **Git** - Control de versiones
 
 ---
 
 ## 📦 Instalación
 
-> 💡 **Para desarrolladores**: Consulta [DESARROLLO.md](DESARROLLO.md) para configurar un entorno de desarrollo con Hot Module Replacement.
+### 🚀 Inicio Rápido
 
-### Prerequisitos
-
-- Docker & Docker Compose
-- Git
-- Node.js 18+ (para desarrollo frontend)
-- Composer (para desarrollo backend)
-
-### 1. Clonar el Repositorio
+Para un inicio rápido, usa el script de desarrollo incluido:
 
 ```bash
-git clone https://github.com/Edisinh0/Taskflow-Icontel.git
-cd Taskflow-Icontel
+# Clonar el repositorio
+git clone https://github.com/tu-usuario/taskflow.git
+cd taskflow
+
+# Ejecutar entorno de desarrollo
+./dev.sh
 ```
 
-### 2. Configurar Backend
+Luego abre **http://localhost:5173** en tu navegador.
+
+> 💡 **Nota**: Los cambios en Vue se reflejan automáticamente con Hot Module Replacement (HMR).
+
+---
+
+### 📋 Prerequisitos
+
+- **Docker & Docker Compose** (para producción)
+- **Git** - Control de versiones
+- **Node.js 20.x o superior** - Para desarrollo frontend
+- **PHP 8.2+** - Para desarrollo backend
+- **Composer** - Gestor de dependencias PHP
+- **MySQL 8.0+** - Base de datos (o usar Docker)
+
+---
+
+### 🔧 Instalación Completa (Desarrollo)
+
+#### 1. Clonar el Repositorio
+
+```bash
+git clone https://github.com/tu-usuario/taskflow.git
+cd taskflow
+```
+
+#### 2. Configurar Backend
 
 ```bash
 cd taskflow-backend
@@ -142,11 +178,13 @@ cd taskflow-backend
 # Copiar archivo de configuración
 cp .env.example .env
 
-# Editar .env con tus credenciales de base de datos
-# DB_HOST=mysql
+# Editar .env con tus credenciales
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
 # DB_DATABASE=taskflow
 # DB_USERNAME=root
-# DB_PASSWORD=root
+# DB_PASSWORD=
 
 # Instalar dependencias
 composer install
@@ -154,47 +192,95 @@ composer install
 # Generar key de aplicación
 php artisan key:generate
 
-# Generar secret JWT
-php artisan jwt:secret
+# Ejecutar migraciones
+php artisan migrate
+
+# Ejecutar seeders (opcional - datos de prueba)
+php artisan db:seed
 ```
 
-### 3. Configurar Frontend
+#### 3. Configurar Frontend
 
 ```bash
 cd ../taskflow-frontend
 
 # Instalar dependencias
 npm install
-
-# Copiar archivo de configuración (si existe)
-cp .env.example .env
 ```
 
-### 4. Levantar con Docker
+#### 4. Iniciar Desarrollo
+
+**Opción A: Con script de desarrollo (recomendado)**
+```bash
+# Desde el directorio raíz
+./dev.sh
+```
+
+**Opción B: Manual**
+```bash
+# Terminal 1 - Backend
+cd taskflow-backend
+php artisan serve
+
+# Terminal 2 - Frontend
+cd taskflow-frontend
+npm run dev
+```
+
+---
+
+### 🐳 Instalación con Docker (Producción)
+
+#### 1. Configurar Variables de Entorno
 
 ```bash
-# Desde el directorio raíz del proyecto
-docker-compose up -d
+cd taskflow-backend
 
-# Ejecutar migraciones
-docker exec -it taskflow-app php artisan migrate
-
-# Ejecutar seeders (opcional - datos de prueba)
-docker exec -it taskflow-app php artisan db:seed
+# Copiar y configurar .env
+cp .env.example .env.docker
+# Editar .env.docker con configuración de producción
 ```
 
-### 5. Acceder a la Aplicación
+#### 2. Construir y Levantar Contenedores
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000/api/v1
+```bash
+docker-compose up -d
+```
+
+#### 3. Ejecutar Migraciones
+
+```bash
+docker-compose exec backend php artisan migrate --force
+
+# Seeders opcionales
+docker-compose exec backend php artisan db:seed --force
+```
+
+#### 4. Acceder a la Aplicación
+
+- **Aplicación**: http://localhost
+- **Backend API**: http://localhost:8000
 - **Base de datos**: localhost:3306
 
-### Credenciales por Defecto
+---
+
+### 🔑 Credenciales por Defecto
 
 ```
 Email: admin@taskflow.com
 Password: password
 ```
+
+> ⚠️ **Importante**: Cambia estas credenciales en producción.
+
+---
+
+### 📚 Más Información
+
+- **[QUICK_START.md](QUICK_START.md)** - Guía de inicio rápido
+- **[DESARROLLO.md](DESARROLLO.md)** - Configuración de desarrollo completa
+- **[PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md)** - Guía de despliegue a producción
+- **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)** - Instrucciones detalladas de configuración
 
 ---
 
@@ -347,14 +433,121 @@ GET    /api/v1/notifications/stats        # Estadísticas
 ### Backend
 ```bash
 cd taskflow-backend
+
+# Ejecutar todos los tests
 php artisan test
+
+# Ejecutar tests específicos
+php artisan test --filter=TaskTest
+
+# Con coverage
+php artisan test --coverage
 ```
 
 ### Frontend
 ```bash
 cd taskflow-frontend
-npm run test
+
+# Lint del código
+npm run lint
+
+# Formatear código
+npm run format
 ```
+
+---
+
+## 📊 CI/CD
+
+El proyecto incluye GitHub Actions para CI/CD automatizado:
+
+- **Frontend CI**: Ejecuta lint y build en cada push/PR
+- **Triggers**: Push a `main`/`master` o cambios en `taskflow-frontend/`
+- **Node.js**: v20.x
+
+Ver configuración en [`.github/workflows/frontend.yml`](.github/workflows/frontend.yml)
+
+---
+
+## 📁 Comandos Útiles
+
+### Desarrollo
+
+```bash
+# Modo desarrollo completo (backend + frontend + queue + logs)
+cd taskflow-backend
+composer run dev
+
+# Solo backend
+php artisan serve
+
+# Solo frontend
+cd taskflow-frontend
+npm run dev
+
+# Ver logs en tiempo real
+php artisan pail
+
+# Procesar colas
+php artisan queue:listen
+```
+
+### Docker
+
+```bash
+# Levantar servicios
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Reiniciar servicio
+docker-compose restart backend
+
+# Detener todo
+docker-compose down
+
+# Reconstruir imagen
+docker-compose build frontend
+```
+
+### Base de Datos
+
+```bash
+# Ejecutar migraciones
+php artisan migrate
+
+# Rollback última migración
+php artisan migrate:rollback
+
+# Refrescar BD (elimina y recrea)
+php artisan migrate:fresh
+
+# Seeders
+php artisan db:seed
+
+# Crear migración
+php artisan make:migration create_table_name
+```
+
+---
+
+## 📚 Documentación
+
+El proyecto incluye documentación completa:
+
+| Archivo | Descripción |
+|---------|-------------|
+| [QUICK_START.md](QUICK_START.md) | Guía de inicio rápido |
+| [DESARROLLO.md](DESARROLLO.md) | Configuración de entorno de desarrollo |
+| [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md) | Despliegue a producción |
+| [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md) | Instrucciones de configuración |
+| [TASKFLOW_ARCHITECTURE.md](TASKFLOW_ARCHITECTURE.md) | Arquitectura del sistema |
+| [TASKFLOW_COMPONENTS_INTERACTION.md](TASKFLOW_COMPONENTS_INTERACTION.md) | Interacción de componentes |
+| [COMANDOS_EJECUCION.md](COMANDOS_EJECUCION.md) | Comandos de ejecución |
+| [CI_CD_GUIDE.md](CI_CD_GUIDE.md) | Guía de CI/CD |
+| [DEPLOY_QUICK_GUIDE.md](DEPLOY_QUICK_GUIDE.md) | Guía rápida de despliegue |
 
 ---
 
@@ -363,14 +556,30 @@ npm run test
 Las contribuciones son bienvenidas. Por favor:
 
 1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+2. Crea una rama para tu feature (`git checkout -b feature/NuevaCaracteristica`)
+3. Realiza tus cambios y asegúrate de que pasen los tests
+4. Commit tus cambios (`git commit -m 'feat: Agregar nueva característica'`)
+5. Push a la rama (`git push origin feature/NuevaCaracteristica`)
+6. Abre un Pull Request
+
+### Guías de Estilo
+
+- **Backend**: Sigue las convenciones de Laravel y PSR-12
+- **Frontend**: Usa ESLint y Prettier (configurados en el proyecto)
+- **Commits**: Usa [Conventional Commits](https://www.conventionalcommits.org/)
 
 ---
 
 ## 📝 Changelog
+
+### v1.1.0 (2026-01-15)
+- ✨ Actualización a Laravel 12.x
+- ✨ Actualización a Vue.js 3.5
+- ✨ Integración de Vue Flow para diagramas
+- ✨ Mejoras en sistema de notificaciones en tiempo real
+- ✨ GitHub Actions para CI/CD
+- 🔧 Script de desarrollo mejorado
+- 📚 Documentación actualizada y expandida
 
 ### v1.0.0 (2025-12-08)
 - ✅ Sistema completo de gestión de flujos y tareas
@@ -378,38 +587,63 @@ Las contribuciones son bienvenidas. Por favor:
 - ✅ Sistema de notificaciones en tiempo real
 - ✅ Dashboard con gráficos interactivos
 - ✅ Modo oscuro completo
-- ✅ Autenticación JWT
+- ✅ Autenticación con Laravel Sanctum
 - ✅ API RESTful completa
 
 ---
 
-## 👥 Autores
+## 👥 Equipo
 
-- **Eddie Cerpa** - *Desarrollo y mantenimiento*
+### Desarrolladores
+- **Eddie Cerpa** - *Desarrollo principal y mantenimiento*
+  - GitHub: [@Edisinh0](https://github.com/Edisinh0)
+  - Email: ed.cerpa@duocuc.cl
+
+### Organización
+- **TNA Group** - Cliente principal
+
+---
+
+## 📄 Licencia
+
+Este proyecto es de código cerrado y está desarrollado para uso interno de TNA Group.
 
 ---
 
 ## 🙏 Agradecimientos
 
-- Laravel Framework
-- Vue.js Team
-- Chart.js Contributors
-- Tailwind CSS Team
+- [Laravel Framework](https://laravel.com) - Framework PHP elegante
+- [Vue.js Team](https://vuejs.org) - Framework JavaScript progresivo
+- [Chart.js Contributors](https://www.chartjs.org) - Gráficos hermosos
+- [Tailwind CSS Team](https://tailwindcss.com) - Utilidades CSS
+- [Vite](https://vitejs.dev) - Build tool ultrarrápido
 - Comunidad Open Source
 
 ---
 
-## 📞 Contacto
+## 📞 Soporte
 
-Para preguntas o soporte:
+Para preguntas, bugs o solicitudes de características:
+
 - **Email**: ed.cerpa@duocuc.cl
-- **GitHub Issues**: [Crear Issue](https://github.com/Edisinh0/Taskflow-Icontel/issues)
+- **Documentación**: Revisa los archivos en la carpeta raíz
+- **Issues**: Contacta al equipo de desarrollo
+
+---
+
+## 🔐 Seguridad
+
+Si descubres alguna vulnerabilidad de seguridad, por favor envía un email a ed.cerpa@duocuc.cl en lugar de usar el issue tracker público.
 
 ---
 
 <div align="center">
 
-**Hecho con ❤️ por Edisinh0**
+**Desarrollado con ❤️ para TNA Group**
+
+[![Made with Laravel](https://img.shields.io/badge/Made%20with-Laravel-red.svg)](https://laravel.com)
+[![Made with Vue.js](https://img.shields.io/badge/Made%20with-Vue.js-green.svg)](https://vuejs.org)
+[![Powered by Docker](https://img.shields.io/badge/Powered%20by-Docker-blue.svg)](https://www.docker.com/)
 
 [⬆ Volver arriba](#-taskflow---sistema-de-gestión-de-flujos-de-trabajo)
 
