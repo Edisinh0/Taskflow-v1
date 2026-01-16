@@ -294,10 +294,12 @@
 import { ref, onMounted } from 'vue'
 import { reportsAPI } from '@/services/reports'
 import { flowsAPI } from '@/services/api'
+import { useToast } from '@/composables/useToast'
 import axios from 'axios'
 import Navbar from '@/components/AppNavbar.vue'
 import { Filter, FileText, FileDown, Inbox, BarChart3 } from 'lucide-vue-next'
 
+const { showError } = useToast()
 const loading = ref(false)
 const tasks = ref([])
 const stats = ref(null)
@@ -403,7 +405,7 @@ const exportToCsv = async () => {
     await reportsAPI.exportCsv(activeFilters)
   } catch (error) {
     console.error('Error al exportar CSV:', error)
-    alert('Error al exportar a CSV')
+    showError('Error al exportar a CSV')
   }
 }
 
@@ -421,7 +423,7 @@ const exportToPdf = async () => {
     await reportsAPI.exportPdf(activeFilters)
   } catch (error) {
     console.error('Error al exportar PDF:', error)
-    alert('Error al exportar a PDF')
+    showError('Error al exportar a PDF')
   }
 }
 

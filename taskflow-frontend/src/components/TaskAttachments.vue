@@ -97,6 +97,7 @@
 import { ref, computed } from 'vue'
 import { FileText, Image, Paperclip, Trash2, UploadCloud } from 'lucide-vue-next'
 import { tasksAPI } from '@/services/api'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
   task: {
@@ -110,6 +111,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['uploaded', 'deleted'])
+const { showError } = useToast()
 
 const fileInput = ref(null)
 const isUploading = ref(false)
@@ -148,7 +150,7 @@ const processFiles = async (files) => {
       emit('uploaded')
     } catch (error) {
       console.error('Error subiendo archivo:', error)
-      alert(`Error subiendo ${file.name}`)
+      showError(`Error subiendo ${file.name}`)
     }
   }
   

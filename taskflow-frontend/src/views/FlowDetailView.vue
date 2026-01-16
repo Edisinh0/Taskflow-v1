@@ -377,6 +377,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { flowsAPI, tasksAPI, templatesAPI } from '@/services/api'
 import { useDragAndDrop } from '@/composables/useDragAndDrop'
+import { useToast } from '@/composables/useToast'
 import TaskTreeItem from '@/components/TaskTreeItem.vue'
 import TaskModal from '@/components/TaskModal.vue'
 import DependencyManager from '@/components/DependencyManager.vue'
@@ -390,6 +391,7 @@ import { CheckCircle2, Zap, Clock, Paperclip, Pencil, List, GitBranch, Calendar 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const { showSuccess, showError, showWarning } = useToast()
 
 const flow = ref(null)
 const loading = ref(true)
@@ -515,7 +517,7 @@ useDragAndDrop(taskListRef, {
       await loadFlow()
     } catch (error) {
       console.error('Error reordenando tarea:', error)
-      alert('Error al reordenar la tarea')
+      showError('Error al reordenar la tarea')
       await loadFlow() // Revertir cambios
     }
   }
@@ -620,7 +622,7 @@ const deleteTask = async (task) => {
     await loadFlow()
   } catch (error) {
     console.error('Error eliminando tarea:', error)
-    alert('Error al eliminar la tarea')
+    showError('Error al eliminar la tarea')
   }
 }
 
@@ -632,7 +634,7 @@ const deleteFlow = async () => {
     router.push('/flows')
   } catch (error) {
     console.error('Error eliminando flujo:', error)
-    alert('Error al eliminar el flujo')
+    showError('Error al eliminar el flujo')
   }
 }
 
@@ -647,10 +649,10 @@ const saveAsTemplate = async () => {
       description: `Generada a partir del flujo: ${flow.value.name}`,
       version: '1.0'
     })
-    alert('Plantilla creada exitosamente')
+    showSuccess('Plantilla creada exitosamente')
   } catch (error) {
     console.error('Error creando plantilla:', error)
-    alert('Error al crear la plantilla')
+    showError('Error al crear la plantilla')
   } finally {
     loading.value = false
   }
@@ -695,7 +697,7 @@ const loadFlow = async () => {
     flow.value = response.data.data
   } catch (error) {
     console.error('Error cargando flujo:', error)
-    alert('Error al cargar el flujo')
+    showError('Error al cargar el flujo')
     router.push('/flows')
   } finally {
     loading.value = false
@@ -762,9 +764,9 @@ const completeTask = async (task) => {
 
   if (!canEdit.value && !isAssignee) {
       if (task.assignee) {
-          alert(`⚠️ Acción no permitida\n\nEsta tarea está asignada a ${task.assignee.name}. Solo el responsable o un administrador puede completarla.`)
+          showWarning(`Esta tarea está asignada a ${task.assignee.name}. Solo el responsable o un administrador puede completarla.`)
       } else {
-          alert(`⚠️ Acción no permitida\n\nEsta tarea no te está asignada.`)
+          showWarning('Esta tarea no te está asignada.')
       }
       return
   }
@@ -788,9 +790,9 @@ const completeTask = async (task) => {
     console.error('Error completando tarea:', error)
     // Mostrar mensaje de error específico si viene del backend
     if (error.response?.data?.message) {
-      alert(error.response.data.message)
+      showError(error.response.data.message)
     } else {
-      alert('Error al completar la tarea')
+      showError('Error al completar la tarea')
     }
   }
 }

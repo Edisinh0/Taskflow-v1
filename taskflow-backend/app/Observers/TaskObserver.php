@@ -40,10 +40,23 @@ class TaskObserver
         try {
             // Usar el método unificado del modelo
             $task->is_blocked = $task->checkIsBlocked();
-            
+
+            // Log detallado para debugging
+            if ($task->depends_on_task_id) {
+                $precedent = Task::find($task->depends_on_task_id);
+                Log::info("🔍 Verificando dependencia de tarea", [
+                    'nueva_tarea' => $task->title,
+                    'depende_de_id' => $task->depends_on_task_id,
+                    'tarea_precedente_status' => $precedent ? $precedent->status : 'NO ENCONTRADA',
+                    'resultado_is_blocked' => $task->is_blocked
+                ]);
+            }
+
             Log::info($task->is_blocked ? "🔒 Tarea creada BLOQUEADA" : "🔓 Tarea creada LIBRE", [
                 'title' => $task->title,
-                'depends_on' => $task->depends_on_task_id ?? $task->depends_on_milestone_id ?? 'ninguna'
+                'depends_on_task_id' => $task->depends_on_task_id,
+                'depends_on_milestone_id' => $task->depends_on_milestone_id,
+                'is_blocked' => $task->is_blocked
             ]);
         } catch (\Exception $e) {
             Log::error('❌ Error calculando bloqueo en creación: ' . $e->getMessage());

@@ -102,6 +102,7 @@ import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 import { Flag, CheckCircle, Lock, User, AlertCircle, Circle } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -116,6 +117,7 @@ const props = defineProps({
 
 const emit = defineEmits(['node-click'])
 const authStore = useAuthStore()
+const { showWarning } = useToast()
 
 const nodes = ref([])
 const edges = ref([])
@@ -294,7 +296,7 @@ const getPriorityColor = (priority) => {
 const onNodeClick = ({ node }) => {
   // Solo permitir edición si el usuario tiene permisos de administración
   if (!canEdit.value) {
-    alert('⚠️ Acción no permitida\n\nSolo los administradores y project managers pueden editar tareas desde el diagrama.')
+    showWarning('Solo los administradores y project managers pueden editar tareas desde el diagrama.')
     return
   }
   emit('node-click', node.data.taskId)

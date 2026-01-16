@@ -639,7 +639,7 @@ Si descubres alguna vulnerabilidad de seguridad, por favor envía un email a ed.
 
 <div align="center">
 
-**Desarrollado con ❤️ para TNA Group**
+**Desarrollado con ❤️ para edisinh0**
 
 [![Made with Laravel](https://img.shields.io/badge/Made%20with-Laravel-red.svg)](https://laravel.com)
 [![Made with Vue.js](https://img.shields.io/badge/Made%20with-Vue.js-green.svg)](https://vuejs.org)

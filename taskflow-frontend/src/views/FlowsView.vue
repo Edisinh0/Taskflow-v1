@@ -288,8 +288,8 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth' // Added import
-
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 import { flowsAPI, templatesAPI } from '@/services/api'
 import FlowModal from '@/components/FlowModal.vue'
 import Navbar from '@/components/AppNavbar.vue'
@@ -306,6 +306,7 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { showError } = useToast()
 const flows = ref([])
 const templates = ref([])
 const showFlowModal = ref(false)
@@ -367,7 +368,7 @@ const deleteFlow = async (flow) => {
     await loadData()
   } catch (error) {
     console.error('Error eliminando proyecto:', error)
-    alert('Error al eliminar el proyecto')
+    showError('Error al eliminar el proyecto')
   }
 }
 
