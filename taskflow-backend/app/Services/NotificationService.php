@@ -37,9 +37,9 @@ class NotificationService
         // Cargar relaciones para broadcast
         $notification->load(['task', 'flow']);
 
-        // Broadcast event para notificación en tiempo real
+        // Broadcast event para notificación en tiempo real - FORZAR BROADCAST INMEDIATO
         if ($notification) {
-            event(new \App\Events\NotificationSent($notification));
+            broadcast(new \App\Events\NotificationSent($notification));
         }
     }
 
@@ -70,9 +70,9 @@ class NotificationService
         // Cargar relaciones para broadcast
         $notification->load(['task', 'flow']);
 
-        // Broadcast event para notificación en tiempo real
+        // Broadcast event para notificación en tiempo real - FORZAR BROADCAST INMEDIATO
         if ($notification) {
-            event(new \App\Events\NotificationSent($notification));
+            broadcast(new \App\Events\NotificationSent($notification));
         }
     }
 
@@ -99,9 +99,9 @@ class NotificationService
         // Cargar relaciones para broadcast
         $notification->load(['task', 'flow']);
 
-        // Broadcast event para notificación en tiempo real
+        // Broadcast event para notificación en tiempo real - FORZAR BROADCAST INMEDIATO
         if ($notification) {
-            event(new \App\Events\NotificationSent($notification));
+            broadcast(new \App\Events\NotificationSent($notification));
         }
     }
 
@@ -158,13 +158,13 @@ class NotificationService
             $oldNotification->load(['task', 'flow']);
 
             if ($oldNotification) {
-                event(new \App\Events\NotificationSent($oldNotification));
+                broadcast(new \App\Events\NotificationSent($oldNotification));
             }
         }
 
         // Broadcast event para el nuevo asignado
         if ($newNotification) {
-            event(new \App\Events\NotificationSent($newNotification));
+            broadcast(new \App\Events\NotificationSent($newNotification));
         }
     }
 
@@ -208,9 +208,9 @@ class NotificationService
         // Cargar relaciones para broadcast
         $notification->load(['task', 'flow']);
 
-        // Broadcast event para notificación en tiempo real
+        // Broadcast event para notificación en tiempo real - FORZAR BROADCAST INMEDIATO
         if ($notification) {
-            event(new \App\Events\NotificationSent($notification));
+            broadcast(new \App\Events\NotificationSent($notification));
         }
     }
 
@@ -248,7 +248,7 @@ class NotificationService
 
                 // Broadcast event para notificación en tiempo real
                 if ($notification) {
-                    event(new \App\Events\NotificationSent($notification));
+                    broadcast(new \App\Events\NotificationSent($notification));
                 }
              }
         }
@@ -276,7 +276,7 @@ class NotificationService
 
                 // Broadcast event para notificación en tiempo real
                 if ($notification) {
-                    event(new \App\Events\NotificationSent($notification));
+                    broadcast(new \App\Events\NotificationSent($notification));
                 }
             }
         }
@@ -325,7 +325,7 @@ class NotificationService
 
             // Broadcast event para notificación en tiempo real
             if ($notification) {
-                event(new \App\Events\NotificationSent($notification));
+                broadcast(new \App\Events\NotificationSent($notification));
             }
         } catch (\Throwable $e) {
             Log::error('Error en flowAssigned: ' . $e->getMessage());
@@ -383,13 +383,13 @@ class NotificationService
             $oldNotification->load(['task', 'flow']);
 
             if ($oldNotification) {
-                event(new \App\Events\NotificationSent($oldNotification));
+                broadcast(new \App\Events\NotificationSent($oldNotification));
             }
         }
 
         // Broadcast event para el nuevo responsable
         if ($newNotification) {
-            event(new \App\Events\NotificationSent($newNotification));
+            broadcast(new \App\Events\NotificationSent($newNotification));
         }
     }
 
@@ -425,9 +425,9 @@ class NotificationService
         // Cargar relaciones para broadcast
         $notification->load(['task', 'flow']);
 
-        // Broadcast event para notificación en tiempo real
+        // Broadcast event para notificación en tiempo real - FORZAR BROADCAST INMEDIATO
         if ($notification) {
-            event(new \App\Events\NotificationSent($notification));
+            broadcast(new \App\Events\NotificationSent($notification));
         }
     }
 }

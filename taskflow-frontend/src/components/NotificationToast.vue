@@ -75,6 +75,8 @@ const notifications = ref([])
 const visibleNotifications = computed(() => notifications.value)
 
 const addNotification = (notification) => {
+  console.log('🎯 NotificationToast.addNotification llamado con:', notification)
+
   const id = notification.id || Date.now() + Math.random()
   const newNotification = {
     ...notification,
@@ -83,6 +85,7 @@ const addNotification = (notification) => {
   }
 
   notifications.value.push(newNotification)
+  console.log('✅ Notificación agregada. Total visible:', notifications.value.length)
 
   // Auto-dismiss después de 5 segundos
   const duration = 5000

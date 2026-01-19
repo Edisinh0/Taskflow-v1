@@ -41,6 +41,17 @@ class TaskObserver
             // Usar el método unificado del modelo
             $task->is_blocked = $task->checkIsBlocked();
 
+            // IMPORTANTE: Si la tarea está bloqueada, cambiar el status a 'blocked'
+            if ($task->is_blocked && !in_array($task->status, ['completed', 'cancelled'])) {
+                $task->status = 'blocked';
+                $task->blocked_reason = 'Esperando tareas precedentes';
+                Log::info("🔒 Tarea creada con status 'blocked' por dependencias", [
+                    'title' => $task->title,
+                    'depends_on_task_id' => $task->depends_on_task_id,
+                    'depends_on_milestone_id' => $task->depends_on_milestone_id,
+                ]);
+            }
+
             // Log detallado para debugging
             if ($task->depends_on_task_id) {
                 $precedent = Task::find($task->depends_on_task_id);
@@ -48,7 +59,8 @@ class TaskObserver
                     'nueva_tarea' => $task->title,
                     'depende_de_id' => $task->depends_on_task_id,
                     'tarea_precedente_status' => $precedent ? $precedent->status : 'NO ENCONTRADA',
-                    'resultado_is_blocked' => $task->is_blocked
+                    'resultado_is_blocked' => $task->is_blocked,
+                    'status_final' => $task->status
                 ]);
             }
 
@@ -56,7 +68,8 @@ class TaskObserver
                 'title' => $task->title,
                 'depends_on_task_id' => $task->depends_on_task_id,
                 'depends_on_milestone_id' => $task->depends_on_milestone_id,
-                'is_blocked' => $task->is_blocked
+                'is_blocked' => $task->is_blocked,
+                'status' => $task->status
             ]);
         } catch (\Exception $e) {
             Log::error('❌ Error calculando bloqueo en creación: ' . $e->getMessage());
@@ -158,18 +171,30 @@ class TaskObserver
         }
 
         // 3. Calcular progreso basado en cambio de estado
-        if ($task->isDirty('status')) {
+        // IMPORTANTE: Solo para tareas normales, NO para milestones
+        // Los milestones calculan su progreso desde las subtareas
+        if ($task->isDirty('status') && !$task->is_milestone) {
             $this->calculateProgressFromStatus($task);
         }
     }
 
     /**
      * Calcular progreso basado en el estado
+     * IMPORTANTE: Solo para tareas normales, NO para milestones
      */
     protected function calculateProgressFromStatus(Task $task): void
     {
+        // Los milestones calculan su progreso desde sus subtareas, no desde su estado
+        if ($task->is_milestone) {
+            Log::info("⏭️ Saltando cálculo de progreso para milestone (se calcula desde subtareas)", [
+                'task_id' => $task->id ?? 'new',
+                'title' => $task->title
+            ]);
+            return;
+        }
+
         $oldProgress = $task->progress ?? 0;
-            
+
         switch ($task->status) {
             case 'pending':
                 $task->progress = 0;
@@ -458,6 +483,13 @@ class TaskObserver
             // Preparar datos para actualización
             $updateData = ['is_blocked' => false];
 
+            // IMPORTANTE: Si la tarea está en estado 'blocked', cambiarla a 'pending'
+            if ($task->status === 'blocked') {
+                $updateData['status'] = 'pending';
+                $updateData['blocked_reason'] = null;
+                Log::info("🔓 Tarea {$task->id} cambiada de 'blocked' a 'pending'");
+            }
+
             // Si es una subtarea (tiene parent_task_id) y está en pending, cambiarla a in_progress
             if ($task->parent_task_id && $task->status === 'pending') {
                 $updateData['status'] = 'in_progress';
@@ -465,7 +497,7 @@ class TaskObserver
             }
 
             $task->update($updateData);
-            Log::info("🔓 Tarea {$task->id} desbloqueada.");
+            Log::info("🔓 Tarea {$task->id} desbloqueada completamente.", $updateData);
         }
     }
 }

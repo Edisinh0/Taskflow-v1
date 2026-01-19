@@ -1,21 +1,41 @@
 <template>
   <RouterView />
+  <NotificationToast ref="notificationToastRef" />
 </template>
 
 <script setup>
 import { RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import { onMounted } from 'vue'
+import { useNotificationsStore } from '@/stores/notifications'
+import { onMounted, watch, ref } from 'vue'
+import NotificationToast from '@/components/NotificationToast.vue'
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
+const notificationsStore = useNotificationsStore()
+const notificationToastRef = ref(null)
 
 // Cargar el usuario del localStorage al iniciar la app
 onMounted(() => {
   authStore.loadFromStorage()
   themeStore.loadTheme() // Cargar tema
 })
+
+// Observar cambios en el array de toasts del store y mostrarlos
+watch(
+  () => notificationsStore.toasts.length,
+  (newLength, oldLength) => {
+    console.log('📊 Toast count changed:', { oldLength, newLength })
+
+    // Solo mostrar si se agregó un nuevo toast
+    if (newLength > oldLength && notificationToastRef.value) {
+      const latestToast = notificationsStore.toasts[newLength - 1]
+      console.log('🎨 Mostrando toast:', latestToast)
+      notificationToastRef.value.addNotification(latestToast)
+    }
+  }
+)
 </script>
 
 <style>

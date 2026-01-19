@@ -195,23 +195,27 @@
             <div class="grid grid-cols-2 gap-5 mb-6">
               <div>
                 <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
-                  Inicio Estimado <span class="text-rose-500">*</span>
+                  Inicio Estimado
+                  <span v-if="!isEditMode" class="text-rose-500">*</span>
+                  <span v-else class="text-xs text-slate-500">(Opcional)</span>
                 </label>
                 <input
                   v-model="formData.estimated_start_at"
                   type="datetime-local"
-                  required
+                  :required="!isEditMode"
                   class="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
               <div>
                 <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
-                  Fin Estimado <span class="text-rose-500">*</span>
+                  Fin Estimado
+                  <span v-if="!isEditMode" class="text-rose-500">*</span>
+                  <span v-else class="text-xs text-slate-500">(Opcional)</span>
                 </label>
                 <input
                   v-model="formData.estimated_end_at"
                   type="datetime-local"
-                  required
+                  :required="!isEditMode"
                   class="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
@@ -391,7 +395,11 @@ const handleSubmit = async () => {
     error.value = null
 
     // Validar campos obligatorios que el HTML5 podría no atajar si son null
-    const required = ['title', 'description', 'assignee_id', 'priority', 'estimated_start_at', 'estimated_end_at']
+    // En modo edición, las fechas son opcionales
+    const required = isEditMode.value
+      ? ['title', 'description', 'assignee_id', 'priority']
+      : ['title', 'description', 'assignee_id', 'priority', 'estimated_start_at', 'estimated_end_at']
+
     const missing = required.filter(k => !formData.value[k])
 
     if (missing.length > 0) {

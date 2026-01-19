@@ -127,7 +127,7 @@ class FlowController extends Controller
                     $task = Task::find($newTaskId);
                     if ($task) {
                         // Forzar refresco por si el observer no corrió o si usamos sistema pivot
-                        $task->is_blocked = $task->isBlocked(); 
+                        $task->is_blocked = $task->checkIsBlocked();
                         if ($task->is_blocked && $task->status !== 'completed' && $task->status !== 'blocked') {
                             $task->status = 'blocked';
                             $task->blocked_reason = 'Esperando tareas precedentes';
@@ -166,10 +166,11 @@ class FlowController extends Controller
     /**
      * Recursively create tasks from template configuration
      */
-    private function createTasksFromTemplate($flowId, $tasks, $parentId = null, &$idMap = [], &$pendingDependencies = [])
+    private function createTasksFromTemplate($flowId, $tasks, $parentId = null, &$idMap = [], &$pendingDependencies = [], $cumulativeOffset = 0)
     {
         $previousSubtaskId = null;
         $isFirstSubtask = true;
+        $currentOffset = $cumulativeOffset; // Track cumulative offset for sequential tasks
 
         foreach ($tasks as $taskData) {
             // Determinar el estado inicial de la tarea
@@ -181,6 +182,14 @@ class FlowController extends Controller
                 $isFirstSubtask = false;
             }
 
+            // Calcular fechas estimadas
+            // Si tiene start_day_offset explícito, usarlo. Si no, usar el offset acumulado
+            $startOffset = $taskData['start_day_offset'] ?? $currentOffset;
+            $durationDays = $taskData['duration_days'] ?? 1; // Duración por defecto: 1 día
+
+            $estimatedStartAt = now()->addDays($startOffset);
+            $estimatedEndAt = now()->addDays($startOffset + $durationDays);
+
             $task = Task::create([
                 'flow_id' => $flowId,
                 'parent_task_id' => $parentId,
@@ -189,9 +198,12 @@ class FlowController extends Controller
                 'is_milestone' => $taskData['is_milestone'] ?? false,
                 'priority' => $taskData['priority'] ?? 'medium',
                 'status' => $initialStatus,
-                'estimated_start_at' => isset($taskData['start_day_offset']) ? now()->addDays($taskData['start_day_offset']) : null,
-                'estimated_end_at' => isset($taskData['duration_days']) ? now()->addDays(($taskData['start_day_offset'] ?? 0) + $taskData['duration_days']) : null,
+                'estimated_start_at' => $estimatedStartAt,
+                'estimated_end_at' => $estimatedEndAt,
             ]);
+
+            // Incrementar el offset acumulado para la siguiente tarea
+            $currentOffset += $durationDays;
 
             // Guardar mapeo si existe referencia
             if (isset($taskData['temp_ref_id'])) {
@@ -231,8 +243,9 @@ class FlowController extends Controller
             }
 
             // Si tiene subtareas, crearlas recursivamente
+            // Las subtareas siempre empiezan desde offset 0 relativo a su milestone
             if (isset($taskData['subtasks']) && is_array($taskData['subtasks'])) {
-                $this->createTasksFromTemplate($flowId, $taskData['subtasks'], $task->id, $idMap, $pendingDependencies);
+                $this->createTasksFromTemplate($flowId, $taskData['subtasks'], $task->id, $idMap, $pendingDependencies, 0);
             }
         }
     }
@@ -288,26 +301,15 @@ class FlowController extends Controller
             'status' => 'sometimes|in:active,paused,completed,cancelled',
         ]);
 
-        // Detectar cambio de responsable para notificación
-        $oldResponsibleId = $flow->responsible_id;
-        $newResponsibleId = $validated['responsible_id'] ?? null;
-
         // Si se marca como completado, guardar la fecha
         if (isset($validated['status']) && $validated['status'] === 'completed' && !$flow->completed_at) {
             $validated['completed_at'] = now();
         }
 
+        // El Observer se encarga automáticamente de:
+        // - Notificar cambio de responsable (FlowObserver::updating)
+        // - Notificar flujo completado (FlowObserver::updating)
         $flow->update($validated);
-
-        // Notificar cambio de responsable
-        if ($oldResponsibleId !== $newResponsibleId && $newResponsibleId) {
-            $oldResponsible = $oldResponsibleId ? \App\Models\User::find($oldResponsibleId) : null;
-            $newResponsible = \App\Models\User::find($newResponsibleId);
-
-            if ($newResponsible) {
-                \App\Services\NotificationService::flowResponsibleChanged($flow, $oldResponsible, $newResponsible);
-            }
-        }
 
         return response()->json([
             'success' => true,

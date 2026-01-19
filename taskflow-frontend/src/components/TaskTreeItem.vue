@@ -41,10 +41,7 @@
               <span v-if="task.status !== 'completed'" class="px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 hover:scale-105" :class="getDaysRemainingClass(task.estimated_end_at)">
                 {{ getDaysRemaining(task.estimated_end_at) }}
               </span>
-              <!-- Badge de bloqueada -->
-              <span v-if="task.is_blocked" class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md">
-                🔒 BLOQUEADA
-              </span>
+              <!-- Badge de estado -->
               <span :class="getStatusBadgeClass(task.status)" class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border border-current/20 shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md">
                 {{ getStatusText(task) }}
               </span>
@@ -155,24 +152,21 @@
 
         <!-- Información de dependencias -->
         <div v-if="task.is_blocked && (task.depends_on_task_id || task.depends_on_milestone_id)" class="mt-3 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-500/20 rounded-lg text-sm">
-          <div class="flex items-start">
-            <Lock class="w-5 h-5 mr-2 text-rose-500" />
-            <div class="flex-1">
-              <p class="font-bold text-rose-600 dark:text-rose-400 mb-1">Tarea Bloqueada</p>
-              <p class="text-rose-500 dark:text-rose-300/80 text-xs">
-                Requiere completar:
-              </p>
-              <ul class="mt-1 space-y-1 text-xs text-rose-500 dark:text-rose-300">
-                <li v-if="task.depends_on_task_id" class="flex items-center">
-                  <ClipboardList class="w-3 h-3 mr-1 opacity-70" />
-                  <span class="font-medium">{{ task.depends_on_task?.title || `Tarea #${task.depends_on_task_id}` }}</span>
-                </li>
-                <li v-if="task.depends_on_milestone_id" class="flex items-center">
-                  <Target class="w-3 h-3 mr-1 opacity-70" />
-                  <span class="font-medium">{{ task.depends_on_milestone?.title || `Milestone #${task.depends_on_milestone_id}` }}</span>
-                </li>
-              </ul>
-            </div>
+          <div>
+            <p class="font-bold text-rose-600 dark:text-rose-400 mb-1">Tarea Bloqueada</p>
+            <p class="text-rose-500 dark:text-rose-300/80 text-xs">
+              Requiere completar:
+            </p>
+            <ul class="mt-1 space-y-1 text-xs text-rose-500 dark:text-rose-300">
+              <li v-if="task.depends_on_task_id" class="flex items-center">
+                <ClipboardList class="w-3 h-3 mr-1 opacity-70" />
+                <span class="font-medium">{{ task.depends_on_task?.title || `Tarea #${task.depends_on_task_id}` }}</span>
+              </li>
+              <li v-if="task.depends_on_milestone_id" class="flex items-center">
+                <Target class="w-3 h-3 mr-1 opacity-70" />
+                <span class="font-medium">{{ task.depends_on_milestone?.title || `Milestone #${task.depends_on_milestone_id}` }}</span>
+              </li>
+            </ul>
           </div>
         </div>
         

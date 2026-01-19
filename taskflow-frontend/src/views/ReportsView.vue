@@ -153,27 +153,129 @@
 
         <!-- Contenido Principal -->
         <div class="lg:col-span-3 space-y-6">
+          <!-- Métricas de SLA (Analytics) -->
+          <div v-if="analytics?.summary?.total_tasks > 0" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xl font-bold text-slate-800 dark:text-white flex items-center">
+                <TrendingUp class="w-6 h-6 mr-2 text-emerald-500" />
+                Métricas de Cumplimiento SLA
+              </h3>
+            </div>
+
+            <!-- Cards de SLA -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <!-- Total Tareas Completadas -->
+              <div class="bg-gradient-to-br from-blue-500/10 to-blue-600/5 dark:from-blue-500/20 dark:to-blue-600/10 rounded-2xl shadow-sm dark:shadow-lg p-5 border border-blue-500/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <Clock class="w-8 h-8 text-blue-500 mb-3" />
+                <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Total Completadas</p>
+                <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">{{ analytics?.summary?.total_completed ?? 0 }}</p>
+              </div>
+
+              <!-- A Tiempo -->
+              <div class="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 dark:from-emerald-500/20 dark:to-emerald-600/10 rounded-2xl shadow-sm dark:shadow-lg p-5 border border-emerald-500/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <CheckCircle2 class="w-8 h-8 text-emerald-500 mb-3" />
+                <p class="text-sm font-medium text-slate-600 dark:text-slate-400">A Tiempo</p>
+                <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{{ analytics?.summary?.completed_on_time ?? 0 }}</p>
+              </div>
+
+              <!-- Tarde -->
+              <div class="bg-gradient-to-br from-rose-500/10 to-rose-600/5 dark:from-rose-500/20 dark:to-rose-600/10 rounded-2xl shadow-sm dark:shadow-lg p-5 border border-rose-500/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <XCircle class="w-8 h-8 text-rose-500 mb-3" />
+                <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Completadas Tarde</p>
+                <p class="text-3xl font-bold text-rose-600 dark:text-rose-400 mt-1">{{ analytics?.summary?.completed_late ?? 0 }}</p>
+              </div>
+
+              <!-- Tasa de Cumplimiento -->
+              <div class="bg-gradient-to-br from-violet-500/10 to-violet-600/5 dark:from-violet-500/20 dark:to-violet-600/10 rounded-2xl shadow-sm dark:shadow-lg p-5 border border-violet-500/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <TrendingUp class="w-8 h-8 text-violet-500 mb-3" />
+                <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Tasa Cumplimiento</p>
+                <p class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">{{ analytics?.summary?.sla_compliance_rate ?? 0 }}%</p>
+              </div>
+
+              <!-- Activas con SLA Incumplido -->
+              <div class="bg-gradient-to-br from-orange-500/10 to-orange-600/5 dark:from-orange-500/20 dark:to-orange-600/10 rounded-2xl shadow-sm dark:shadow-lg p-5 border border-orange-500/20 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                <AlertTriangle class="w-8 h-8 text-orange-500 mb-3" />
+                <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Activas Incumplidas</p>
+                <p class="text-3xl font-bold text-orange-600 dark:text-orange-400 mt-1">{{ analytics?.summary?.active_with_sla_breach ?? 0 }}</p>
+              </div>
+            </div>
+
+            <!-- Promedio Días de Retraso (si existe) -->
+            <div v-if="(analytics?.summary?.avg_days_overdue ?? 0) > 0" class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-xl p-4">
+              <div class="flex items-center">
+                <AlertTriangle class="w-5 h-5 text-amber-600 dark:text-amber-500 mr-3" />
+                <div>
+                  <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">Promedio de Retraso</p>
+                  <p class="text-xs text-amber-700 dark:text-amber-300">Las tareas tardías tienen un promedio de <span class="font-bold">{{ analytics?.summary?.avg_days_overdue ?? 0 }} días</span> de retraso</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rendimiento Temporal (Últimos 30 días) -->
+            <div v-if="validPerformanceDays.length > 0" class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg border border-slate-200 dark:border-white/5 p-6">
+              <h4 class="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center">
+                <BarChart3 class="w-5 h-5 mr-2 text-blue-500" />
+                Rendimiento Últimos 30 Días
+              </h4>
+
+              <div class="space-y-2">
+                <div v-for="day in validPerformanceDays.slice(-10)" :key="day.date" class="flex items-center">
+                  <div class="w-24 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                    {{ formatDate(day.date) }}
+                  </div>
+                  <div class="flex-1 flex items-center space-x-2">
+                    <!-- Barra de Completadas -->
+                    <div class="flex-1 bg-slate-100 dark:bg-slate-900 rounded-full h-6 overflow-hidden relative">
+                      <div
+                        v-if="day.completed > 0"
+                        class="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 flex items-center justify-end px-2 transition-all duration-500"
+                        :style="{ width: `${getBarWidth(day.completed)}%` }"
+                      >
+                        <span class="text-xs font-bold text-white">{{ day.completed }}</span>
+                      </div>
+                    </div>
+                    <div class="w-20 text-xs text-slate-500 dark:text-slate-400">
+                      <span class="font-bold text-emerald-600 dark:text-emerald-400">{{ day.on_time || 0 }}</span> a tiempo
+                    </div>
+                    <div class="w-20 text-xs text-slate-500 dark:text-slate-400" v-if="day.late > 0">
+                      <span class="font-bold text-rose-600 dark:text-rose-400">{{ day.late }}</span> tarde
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 text-xs text-slate-500 dark:text-slate-400">
+                Mostrando los últimos 10 días con actividad de {{ validPerformanceDays.length }} días totales
+              </div>
+            </div>
+          </div>
+
           <!-- Estadísticas -->
-          <div v-if="stats" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div v-if="stats?.total >= 0" class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg p-5 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
               <div class="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 dark:bg-blue-500/10 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:bg-blue-500/10 dark:group-hover:bg-blue-500/20"></div>
               <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Tareas</p>
-              <p class="text-3xl font-bold text-slate-800 dark:text-white mt-2">{{ stats.total }}</p>
+              <p class="text-3xl font-bold text-slate-800 dark:text-white mt-2">{{ stats?.total ?? 0 }}</p>
             </div>
             <div class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg p-5 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
                <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:bg-emerald-500/10 dark:group-hover:bg-emerald-500/20"></div>
               <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Completadas</p>
-              <p class="text-3xl font-bold text-emerald-500 dark:text-emerald-400 mt-2">{{ stats.by_status.completed }}</p>
+              <p class="text-3xl font-bold text-emerald-500 dark:text-emerald-400 mt-2">{{ stats?.by_status?.completed ?? 0 }}</p>
             </div>
             <div class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg p-5 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
                <div class="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:bg-indigo-500/10 dark:group-hover:bg-indigo-500/20"></div>
               <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Progreso Promedio</p>
-              <p class="text-3xl font-bold text-indigo-500 dark:text-indigo-400 mt-2">{{ stats.avg_progress }}%</p>
+              <p class="text-3xl font-bold text-indigo-500 dark:text-indigo-400 mt-2">{{ stats?.avg_progress ?? 0 }}%</p>
             </div>
             <div class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg p-5 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
                <div class="absolute top-0 right-0 w-20 h-20 bg-rose-500/5 dark:bg-rose-500/10 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:bg-rose-500/10 dark:group-hover:bg-rose-500/20"></div>
               <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Bloqueadas</p>
-              <p class="text-3xl font-bold text-rose-500 dark:text-rose-400 mt-2">{{ stats.blocked }}</p>
+              <p class="text-3xl font-bold text-rose-500 dark:text-rose-400 mt-2">{{ stats?.blocked ?? 0 }}</p>
             </div>
           </div>
 
@@ -291,18 +393,68 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { reportsAPI } from '@/services/reports'
-import { flowsAPI } from '@/services/api'
+import { ref, onMounted, computed } from 'vue'
+import { reportsAPI, flowsAPI } from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import axios from 'axios'
 import Navbar from '@/components/AppNavbar.vue'
-import { Filter, FileText, FileDown, Inbox, BarChart3 } from 'lucide-vue-next'
+import { Filter, FileText, FileDown, Inbox, BarChart3, TrendingUp, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-vue-next'
 
 const { showError } = useToast()
 const loading = ref(false)
+const loadingAnalytics = ref(false)
 const tasks = ref([])
-const stats = ref(null)
+const stats = ref({
+  total: 0,
+  by_status: {
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
+    paused: 0,
+    cancelled: 0
+  },
+  by_priority: {
+    low: 0,
+    medium: 0,
+    high: 0,
+    urgent: 0
+  },
+  avg_progress: 0,
+  milestones: 0,
+  blocked: 0
+})
+const analytics = ref({
+  summary: {
+    total_tasks: 0,
+    completed_tasks: 0,
+    total_completed: 0,
+    completed_on_time: 0,
+    completed_late: 0,
+    active_with_sla_breach: 0,
+    avg_days_overdue: 0,
+    avg_progress: 0,
+    sla_compliance_rate: 0
+  },
+  tasks_by_status: {
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
+    paused: 0,
+    cancelled: 0,
+    blocked: 0
+  },
+  tasks_by_priority: {
+    low: 0,
+    medium: 0,
+    high: 0,
+    urgent: 0
+  },
+  performance_by_day: [],
+  milestones: {
+    total: 0,
+    completed: 0
+  }
+})
 const users = ref([])
 const flows = ref([])
 const meta = ref({
@@ -310,6 +462,12 @@ const meta = ref({
   last_page: 1,
   per_page: 50,
   total: 0
+})
+
+// Computed property para filtrar días válidos
+const validPerformanceDays = computed(() => {
+  if (!analytics.value?.performance_by_day) return []
+  return analytics.value.performance_by_day.filter(day => day && day.date)
 })
 
 const filters = ref({
@@ -321,6 +479,25 @@ const filters = ref({
   date_to: '',
   is_milestone: false
 })
+
+const loadAnalytics = async () => {
+  loadingAnalytics.value = true
+  try {
+    const activeFilters = {}
+    if (filters.value.assignee_id) activeFilters.assignee_id = filters.value.assignee_id
+    if (filters.value.flow_id) activeFilters.flow_id = filters.value.flow_id
+    if (filters.value.date_from) activeFilters.date_from = filters.value.date_from
+    if (filters.value.date_to) activeFilters.date_to = filters.value.date_to
+
+    const response = await reportsAPI.getAnalytics(activeFilters)
+    analytics.value = response.data.data || analytics.value
+  } catch (error) {
+    console.error('Error al cargar analytics:', error)
+    analytics.value = null
+  } finally {
+    loadingAnalytics.value = false
+  }
+}
 
 const applyFilters = async () => {
   loading.value = true
@@ -337,13 +514,16 @@ const applyFilters = async () => {
 
     // Obtener datos
     const [reportData, statsData] = await Promise.all([
-      reportsAPI.getReport(activeFilters, 1),
+      reportsAPI.getAll(activeFilters),
       reportsAPI.getStats(activeFilters)
     ])
 
-    tasks.value = reportData.data || []
-    meta.value = reportData.meta || { current_page: 1, last_page: 1, total: 0, per_page: 50 }
-    stats.value = statsData.data || null
+    tasks.value = reportData.data.data || []
+    meta.value = reportData.data.meta || { current_page: 1, last_page: 1, total: 0, per_page: 50 }
+    stats.value = statsData.data.data || stats.value
+
+    // Cargar analytics también
+    await loadAnalytics()
   } catch (error) {
     console.error('Error al cargar reporte:', error)
     tasks.value = []
@@ -368,7 +548,7 @@ const clearFilters = () => {
 
 const changePage = async (page) => {
   if (page < 1 || page > meta.value.last_page) return
-  
+
   loading.value = true
   try {
     const activeFilters = {}
@@ -379,10 +559,11 @@ const changePage = async (page) => {
     if (filters.value.date_from) activeFilters.date_from = filters.value.date_from
     if (filters.value.date_to) activeFilters.date_to = filters.value.date_to
     if (filters.value.is_milestone) activeFilters.is_milestone = 1
+    activeFilters.page = page
 
-    const reportData = await reportsAPI.getReport(activeFilters, page)
-    tasks.value = reportData.data || []
-    meta.value = reportData.meta || { current_page: 1, last_page: 1, total: 0, per_page: 50 }
+    const reportData = await reportsAPI.getAll(activeFilters)
+    tasks.value = reportData.data.data || []
+    meta.value = reportData.data.meta || { current_page: 1, last_page: 1, total: 0, per_page: 50 }
   } catch (error) {
     console.error('Error al cambiar página:', error)
     tasks.value = []
@@ -469,6 +650,22 @@ const getPriorityText = (priority) => {
     urgent: 'Urgente'
   }
   return texts[priority] || priority
+}
+
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}`
+}
+
+const getBarWidth = (completed) => {
+  if (!analytics.value?.performance_by_day || analytics.value.performance_by_day.length === 0) {
+    return 0
+  }
+  const maxCompleted = Math.max(...analytics.value.performance_by_day.map(d => d.completed || 0))
+  if (maxCompleted === 0) return 0
+  return (completed / maxCompleted) * 100
 }
 
 const loadInitialData = async () => {

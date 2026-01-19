@@ -68,6 +68,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
 
   function showToast(notification) {
+    console.log('🔔 showToast llamado con:', notification)
+
     const toast = {
       id: notification.id || Date.now(),
       ...notification,
@@ -75,6 +77,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     }
 
     toasts.value.push(toast)
+    console.log('✅ Toast agregado al array. Total toasts:', toasts.value.length)
 
     // Auto-remove after 5 seconds
     setTimeout(() => {

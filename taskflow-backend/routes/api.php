@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TaskDependencyController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -105,10 +106,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/stats', [NotificationController::class, 'stats']);
 
     // Reportes
-    Route::get('/reports', [App\Http\Controllers\Api\ReportController::class, 'index']);
-    Route::get('/reports/stats', [App\Http\Controllers\Api\ReportController::class, 'stats']);
-    Route::get('/reports/export/csv', [App\Http\Controllers\Api\ReportController::class, 'exportCsv']);
-    Route::get('/reports/export/pdf', [App\Http\Controllers\Api\ReportController::class, 'exportPdf']);
+    Route::get('/reports', [ReportController::class, 'index']);
+    Route::get('/reports/stats', [ReportController::class, 'stats']);
+    Route::get('/reports/analytics', [ReportController::class, 'analytics']);
+    Route::get('/reports/export/csv', [ReportController::class, 'exportCsv']);
+    Route::get('/reports/export/pdf', [ReportController::class, 'exportPdf']);
 
     // Adjuntos de Tareas
     Route::post('/tasks/{task}/attachments', [App\Http\Controllers\Api\TaskAttachmentController::class, 'store']);

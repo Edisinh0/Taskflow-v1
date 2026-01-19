@@ -83,6 +83,27 @@ class ReportController extends Controller
     }
 
     /**
+     * Obtener métricas de analytics/dashboard
+     * GET /api/v1/reports/analytics
+     */
+    public function analytics(Request $request)
+    {
+        $filters = $request->only([
+            'date_from',
+            'date_to',
+            'flow_id',
+            'assignee_id'
+        ]);
+
+        $analytics = $this->reportService->getAnalytics($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $analytics
+        ]);
+    }
+
+    /**
      * Exportar reporte a CSV
      * GET /api/v1/reports/export/csv
      */

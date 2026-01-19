@@ -123,13 +123,18 @@ class TemplateController extends Controller
 
         // Construir configuración de tareas
         $tasksConfig = [];
-        
+
         // Mapa para rastrear IDs originales -> temp_refs para dependencias
         // Usaremos el ID original como referencia temporal
-        
+
         // 1. Identificar hitos
         $milestones = $flow->tasks->where('is_milestone', true);
-        
+
+        // Obtener la fecha de inicio más temprana del flujo para calcular offsets relativos
+        $flowStartDate = $flow->tasks
+            ->filter(fn($t) => $t->estimated_start_at)
+            ->min('estimated_start_at');
+
         foreach ($milestones as $milestone) {
             $milestoneConfig = [
                 'temp_ref_id' => $milestone->id,
@@ -141,15 +146,30 @@ class TemplateController extends Controller
 
             // 2. Encontrar subtareas para este hito
             $subtasks = $flow->tasks->filter(function ($task) use ($milestone) {
-                return !$task->is_milestone && 
+                return !$task->is_milestone &&
                        ($task->parent_task_id == $milestone->id || $task->depends_on_milestone_id == $milestone->id);
             });
+
+            // Ordenar subtareas por fecha de inicio para mantener el orden secuencial
+            $subtasks = $subtasks->sortBy('estimated_start_at');
 
             foreach ($subtasks as $subtask) {
                 // Recopilar IDs de tareas de las que depende esta subtarea (Sistema M:N)
                 $dependencyRefs = [];
                 foreach ($subtask->dependencies as $dep) {
                     $dependencyRefs[] = $dep->depends_on_task_id;
+                }
+
+                // Calcular offset relativo desde el inicio del flujo
+                $startDayOffset = 0;
+                if ($flowStartDate && $subtask->estimated_start_at) {
+                    $startDayOffset = $flowStartDate->diffInDays($subtask->estimated_start_at);
+                }
+
+                // Calcular duración en días
+                $durationDays = 1; // Default
+                if ($subtask->estimated_end_at && $subtask->estimated_start_at) {
+                    $durationDays = max(1, $subtask->estimated_start_at->diffInDays($subtask->estimated_end_at));
                 }
 
                 $milestoneConfig['subtasks'][] = [
@@ -159,9 +179,8 @@ class TemplateController extends Controller
                     'priority' => $subtask->priority,
                     'dependencies' => $dependencyRefs, // Sistema complejo (pivote)
                     'depends_on_task_ref' => $subtask->depends_on_task_id, // Sistema simple (columna, usado por frontend)
-                    'duration_days' => $subtask->estimated_end_at && $subtask->estimated_start_at 
-                        ? $subtask->estimated_start_at->diffInDays($subtask->estimated_end_at) 
-                        : 1
+                    'start_day_offset' => $startDayOffset,
+                    'duration_days' => $durationDays
                 ];
             }
 

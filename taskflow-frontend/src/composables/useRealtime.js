@@ -24,10 +24,26 @@ export function useRealtime(channelName, events = {}) {
       // Subscribe to channel
       channel.value = echo.private(channelName)
 
+      // Debug: Acceder al Pusher connection directamente para ver TODOS los eventos
+      if (echo.connector && echo.connector.pusher) {
+        const pusherChannel = echo.connector.pusher.channel(`private-${channelName}`)
+        if (pusherChannel) {
+          pusherChannel.bind_global((eventName, data) => {
+            console.log('🌍 [PUSHER GLOBAL] Evento capturado:', eventName, data)
+          })
+        }
+      }
+
       // Register event listeners
       Object.keys(events).forEach((eventName) => {
+        // Laravel Echo requiere punto al inicio para eventos personalizados (no Pusher defaults)
         const fullEventName = eventName.startsWith('.') ? eventName : `.${eventName}`
-        channel.value.listen(fullEventName, events[eventName])
+        console.log(`👂 Registrando listener para evento: ${fullEventName} en canal: ${channelName}`)
+        channel.value.listen(fullEventName, (data) => {
+          console.log(`📨 Evento recibido: ${fullEventName}`, data)
+          console.log(`📦 Datos completos:`, JSON.stringify(data, null, 2))
+          events[eventName](data)
+        })
       })
 
       isConnected.value = true

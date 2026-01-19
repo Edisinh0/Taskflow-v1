@@ -59,21 +59,22 @@
             </div>
 
             <!-- Filas de Tareas -->
-            <div 
-                v-for="task in sortTasks(tasks)" 
+            <div
+                v-for="task in sortTasks(flattenTasks)"
                 :key="task.id"
                 class="flex border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors h-12 relative group"
             >
                 <!-- Columna Nombre -->
                 <div class="w-64 flex-shrink-0 px-4 flex items-center border-r border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 z-10 sticky left-0">
                     <div class="truncate text-sm font-medium text-slate-700 dark:text-slate-200" :title="task.title">
+                        <span v-if="task.parent_task_id" class="text-slate-400 mr-1">└</span>
                         {{ task.title }}
                     </div>
                 </div>
 
                 <!-- Barra de Tiempo -->
                 <div class="flex-1 relative">
-                    <div 
+                    <div
                         v-if="isValidDate(task.estimated_start_at) && isValidDate(task.estimated_end_at)"
                         class="absolute h-6 top-3 rounded-md shadow-sm border border-black/10 transition-all cursor-pointer hover:brightness-110 flex items-center px-2 overflow-hidden text-xs text-white font-medium whitespace-nowrap"
                         :class="getTaskColor(task)"
@@ -84,10 +85,13 @@
                     </div>
                 </div>
             </div>
-             
+
              <!-- Empty State -->
-             <div v-if="tasks.length === 0" class="p-8 text-center text-slate-400">
-                No hay tareas con fechas para mostrar.
+             <div v-if="flattenTasks.length === 0" class="p-8 text-center text-slate-400">
+                No hay tareas para mostrar.
+             </div>
+             <div v-else-if="flattenTasks.filter(t => isValidDate(t.estimated_start_at) && isValidDate(t.estimated_end_at)).length === 0" class="p-8 text-center text-slate-400">
+                No hay tareas con fechas estimadas para mostrar en el diagrama de Gantt.
              </div>
         </div>
       </div>
@@ -96,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   tasks: {
@@ -115,6 +119,39 @@ const modes = [
 ]
 
 const today = new Date()
+
+// Aplanar todas las tareas incluyendo subtareas
+const flattenTasks = computed(() => {
+  const result = []
+
+  const addTask = (task) => {
+    // Agregar la tarea principal
+    result.push(task)
+
+    // Agregar subtareas recursivamente
+    if (task.subtasks && Array.isArray(task.subtasks)) {
+      task.subtasks.forEach(subtask => addTask(subtask))
+    }
+  }
+
+  // Procesar todas las tareas
+  props.tasks.forEach(task => addTask(task))
+
+  // Debug: mostrar info de las tareas
+  console.log('TaskGantt - Total tasks received:', props.tasks.length)
+  console.log('TaskGantt - Flattened tasks:', result.length)
+  console.log('TaskGantt - Tasks with dates:', result.filter(t => isValidDate(t.estimated_start_at) && isValidDate(t.estimated_end_at)).length)
+  if (result.length > 0) {
+    console.log('TaskGantt - First task sample:', {
+      title: result[0].title,
+      estimated_start_at: result[0].estimated_start_at,
+      estimated_end_at: result[0].estimated_end_at,
+      has_subtasks: result[0].subtasks?.length || 0
+    })
+  }
+
+  return result
+})
 
 // Generar fechas para el timeline
 const timelineDates = computed(() => {

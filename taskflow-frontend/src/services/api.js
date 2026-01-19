@@ -96,6 +96,15 @@ export const usersAPI = {
   delete: (id) => api.delete(`/users/${id}`),
 }
 
+// ========== REPORTS ==========
+export const reportsAPI = {
+  getAll: (params) => api.get('/reports', { params }),
+  getStats: (params) => api.get('/reports/stats', { params }),
+  getAnalytics: (params) => api.get('/reports/analytics', { params }),
+  exportCsv: (params) => api.get('/reports/export/csv', { params, responseType: 'blob' }),
+  exportPdf: (params) => api.get('/reports/export/pdf', { params, responseType: 'blob' }),
+}
+
 // ========== FLOW BUILDER MODULE (PM/Admin) ==========
 export const flowBuilderAPI = {
   createFlow: (data) => api.post('/flow-builder/flows', data),

@@ -74,24 +74,121 @@ class ReportService
         $query = $this->buildQuery($filters);
         $tasks = $query->get();
 
+        // Asegurar que avg_progress siempre devuelva un número válido
+        $avgProgress = $tasks->count() > 0 ? round($tasks->avg('progress'), 2) : 0;
+
         return [
-            'total' => $tasks->count(),
+            'total' => $tasks->count() ?? 0,
             'by_status' => [
-                'pending' => $tasks->where('status', 'pending')->count(),
-                'in_progress' => $tasks->where('status', 'in_progress')->count(),
-                'completed' => $tasks->where('status', 'completed')->count(),
-                'paused' => $tasks->where('status', 'paused')->count(),
-                'cancelled' => $tasks->where('status', 'cancelled')->count(),
+                'pending' => $tasks->where('status', 'pending')->count() ?? 0,
+                'in_progress' => $tasks->where('status', 'in_progress')->count() ?? 0,
+                'completed' => $tasks->where('status', 'completed')->count() ?? 0,
+                'paused' => $tasks->where('status', 'paused')->count() ?? 0,
+                'cancelled' => $tasks->where('status', 'cancelled')->count() ?? 0,
             ],
             'by_priority' => [
-                'low' => $tasks->where('priority', 'low')->count(),
-                'medium' => $tasks->where('priority', 'medium')->count(),
-                'high' => $tasks->where('priority', 'high')->count(),
-                'urgent' => $tasks->where('priority', 'urgent')->count(),
+                'low' => $tasks->where('priority', 'low')->count() ?? 0,
+                'medium' => $tasks->where('priority', 'medium')->count() ?? 0,
+                'high' => $tasks->where('priority', 'high')->count() ?? 0,
+                'urgent' => $tasks->where('priority', 'urgent')->count() ?? 0,
             ],
-            'avg_progress' => round($tasks->avg('progress'), 2),
-            'milestones' => $tasks->where('is_milestone', true)->count(),
-            'blocked' => $tasks->where('is_blocked', true)->count(),
+            'avg_progress' => $avgProgress ?? 0,
+            'milestones' => $tasks->where('is_milestone', true)->count() ?? 0,
+            'blocked' => $tasks->where('is_blocked', true)->count() ?? 0,
+        ];
+    }
+
+    /**
+     * Obtener métricas de analytics con SLA
+     */
+    public function getAnalytics(array $filters): array
+    {
+        $query = $this->buildQuery($filters);
+        $tasks = $query->get();
+
+        // Tareas completadas
+        $completedTasks = $tasks->where('status', 'completed');
+
+        // Tareas completadas a tiempo (sin SLA breach)
+        $completedOnTime = $completedTasks->where('sla_breached', false)->count();
+        $completedLate = $completedTasks->where('sla_breached', true)->count();
+
+        // Tareas activas con SLA breach
+        $activeTasks = $tasks->whereNotIn('status', ['completed', 'cancelled']);
+        $activeWithSLABreach = $activeTasks->where('sla_breached', true)->count();
+
+        // Promedio de días de retraso
+        $avgDaysOverdue = $tasks->where('sla_breached', true)
+            ->where('sla_days_overdue', '>', 0)
+            ->avg('sla_days_overdue');
+
+        // Tareas por estado
+        $tasksByStatus = [
+            'pending' => $tasks->where('status', 'pending')->count(),
+            'in_progress' => $tasks->where('status', 'in_progress')->count(),
+            'completed' => $tasks->where('status', 'completed')->count(),
+            'paused' => $tasks->where('status', 'paused')->count(),
+            'cancelled' => $tasks->where('status', 'cancelled')->count(),
+            'blocked' => $tasks->where('status', 'blocked')->count(),
+        ];
+
+        // Tareas por prioridad
+        $tasksByPriority = [
+            'low' => $tasks->where('priority', 'low')->count(),
+            'medium' => $tasks->where('priority', 'medium')->count(),
+            'high' => $tasks->where('priority', 'high')->count(),
+            'urgent' => $tasks->where('priority', 'urgent')->count(),
+        ];
+
+        // Rendimiento temporal (últimos 30 días)
+        $performanceByDay = [];
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $dayTasks = $tasks->filter(function ($task) use ($date) {
+                return $task->completed_at && $task->completed_at->format('Y-m-d') === $date;
+            });
+
+            $completedToday = $dayTasks->where('status', 'completed');
+
+            $performanceByDay[] = [
+                'date' => $date,
+                'completed' => $completedToday->count(),
+                'on_time' => $completedToday->where('sla_breached', false)->count(),
+                'late' => $completedToday->where('sla_breached', true)->count(),
+                'created' => $tasks->filter(function ($task) use ($date) {
+                    return $task->created_at->format('Y-m-d') === $date;
+                })->count(),
+            ];
+        }
+
+        // Tasa de cumplimiento de SLA
+        $totalCompleted = $completedTasks->count();
+        $slaComplianceRate = $totalCompleted > 0
+            ? round(($completedOnTime / $totalCompleted) * 100, 2)
+            : 0;
+
+        // Asegurar que avg_progress siempre devuelva un número válido
+        $avgProgressAnalytics = $tasks->count() > 0 ? round($tasks->avg('progress'), 2) : 0;
+
+        return [
+            'summary' => [
+                'total_tasks' => $tasks->count() ?? 0,
+                'completed_tasks' => $completedTasks->count() ?? 0,
+                'total_completed' => $completedTasks->count() ?? 0, // Alias para compatibilidad frontend
+                'completed_on_time' => $completedOnTime ?? 0,
+                'completed_late' => $completedLate ?? 0,
+                'active_with_sla_breach' => $activeWithSLABreach ?? 0,
+                'avg_days_overdue' => round($avgDaysOverdue ?? 0, 1),
+                'avg_progress' => $avgProgressAnalytics ?? 0,
+                'sla_compliance_rate' => $slaComplianceRate ?? 0,
+            ],
+            'tasks_by_status' => $tasksByStatus,
+            'tasks_by_priority' => $tasksByPriority,
+            'performance_by_day' => $performanceByDay ?? [],
+            'milestones' => [
+                'total' => $tasks->where('is_milestone', true)->count() ?? 0,
+                'completed' => $tasks->where('is_milestone', true)->where('status', 'completed')->count() ?? 0,
+            ],
         ];
     }
 

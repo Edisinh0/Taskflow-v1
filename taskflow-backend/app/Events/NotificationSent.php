@@ -7,11 +7,11 @@ use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class NotificationSent implements ShouldBroadcast
+class NotificationSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -23,6 +23,13 @@ class NotificationSent implements ShouldBroadcast
     public function __construct(Notification $notification)
     {
         $this->notification = $notification->load(['task', 'flow']);
+
+        \Log::info('🔥 NotificationSent Event Constructor', [
+            'notification_id' => $notification->id,
+            'user_id' => $notification->user_id,
+            'type' => $notification->type,
+            'title' => $notification->title,
+        ]);
     }
 
     /**
@@ -32,8 +39,14 @@ class NotificationSent implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
+        $channel = 'user.' . $this->notification->user_id;
+        \Log::info('📡 NotificationSent broadcastOn called', [
+            'channel' => $channel,
+            'notification_id' => $this->notification->id,
+        ]);
+
         return [
-            new PrivateChannel('user.' . $this->notification->user_id),
+            new PrivateChannel($channel),
         ];
     }
 
@@ -50,7 +63,7 @@ class NotificationSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
-        return [
+        $data = [
             'notification' => [
                 'id' => $this->notification->id,
                 'type' => $this->notification->type,
@@ -64,5 +77,11 @@ class NotificationSent implements ShouldBroadcast
             ],
             'timestamp' => now()->toIso8601String(),
         ];
+
+        \Log::info('📦 NotificationSent broadcastWith called', [
+            'data' => $data,
+        ]);
+
+        return $data;
     }
 }
