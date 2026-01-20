@@ -11,7 +11,7 @@ return [
     | framework when an event needs to be broadcast. You may set this to
     | any of the connections defined in the "connections" array below.
     |
-    | Supported: "pusher", "ably", "redis", "log", "null"
+    | Supported: "reverb", "redis", "log", "null"
     |
     */
 
@@ -30,27 +30,24 @@ return [
 
     'connections' => [
 
-        'pusher' => [
-            'driver' => 'pusher',
-            'key' => env('PUSHER_APP_KEY'),
-            'secret' => env('PUSHER_APP_SECRET'),
-            'app_id' => env('PUSHER_APP_ID'),
+        'reverb' => [
+            'driver' => 'reverb',
+            'key' => env('REVERB_APP_KEY'),
+            'secret' => env('REVERB_APP_SECRET'),
+            'app_id' => env('REVERB_APP_ID'),
             'options' => [
-                'cluster' => env('PUSHER_APP_CLUSTER'),
-                'host' => env('PUSHER_HOST') ?: 'api-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com',
-                'port' => env('PUSHER_PORT', 443),
-                'scheme' => env('PUSHER_SCHEME', 'https'),
-                'encrypted' => true,
-                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+                // Host debe ser 'localhost' para que las firmas coincidan con el cliente
+                // El backend se conecta a Reverb via 'reverb:8080' (nombre del contenedor)
+                // pero las firmas deben usar 'localhost' que es lo que el navegador usa
+                'host' => env('REVERB_HOST', 'localhost'),
+                'port' => env('REVERB_PORT', 8080),
+                'scheme' => env('REVERB_SCHEME', 'http'),
+                'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
             ],
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Guzzle se conecta al contenedor Docker usando el nombre del servicio
+                'base_uri' => env('REVERB_SCHEME', 'http') . '://' . env('REVERB_SERVER_HOST', 'reverb') . ':' . env('REVERB_PORT', 8080),
             ],
-        ],
-
-        'ably' => [
-            'driver' => 'ably',
-            'key' => env('ABLY_KEY'),
         ],
 
         'redis' => [

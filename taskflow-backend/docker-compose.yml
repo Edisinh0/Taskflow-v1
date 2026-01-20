@@ -108,19 +108,29 @@ services:
       - taskflow_net
 
   # ---------------------------------------------------------------------------
-  # WEBSOCKETS (Soketi)
+  # WEBSOCKETS (Laravel Reverb)
   # ---------------------------------------------------------------------------
-  soketi:
-    image: quay.io/soketi/soketi:latest-16-alpine
-    container_name: taskflow_soketi_new
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_reverb_new
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
     restart: unless-stopped
     ports:
-      - "6001:6001"
+      - "8080:8080"
     environment:
-      SOKETI_DEBUG: "1"
-      SOKETI_DEFAULT_APP_ID: "taskflow-app"
-      SOKETI_DEFAULT_APP_KEY: "taskflow-key"
-      SOKETI_DEFAULT_APP_SECRET: "taskflow-secret"
+      APP_ENV: production
+      REVERB_SERVER_HOST: "0.0.0.0"
+      REVERB_SERVER_PORT: "8080"
+      # REVERB_HOST debe ser 'localhost' o null para que las firmas coincidan con el cliente
+      REVERB_HOST: "localhost"
+      REVERB_PORT: "8080"
+      REVERB_SCHEME: "http"
+    depends_on:
+      - redis
+    volumes:
+      - ./:/var/www/html
     networks:
       - taskflow_net
 

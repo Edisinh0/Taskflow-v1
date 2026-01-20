@@ -15,16 +15,14 @@ export function initializeEcho(authToken) {
     // Broadcasting auth está bajo /api/broadcasting/auth, no /broadcasting/auth
     const broadcastingAuthEndpoint = apiBaseUrl.replace('/v1', '/broadcasting/auth')
 
+    // Reverb usa el broadcaster 'reverb' que es el broadcaster nativo de Laravel Reverb
     echoInstance = new Echo({
-      broadcaster: 'pusher',
-      key: import.meta.env.VITE_PUSHER_APP_KEY || 'taskflow-key',
-      cluster: import.meta.env.VITE_PUSHER_CLUSTER || 'mt1',
-      wsHost: import.meta.env.VITE_PUSHER_HOST || 'localhost',
-      wsPort: import.meta.env.VITE_PUSHER_PORT || 6001,
-      wssPort: import.meta.env.VITE_PUSHER_PORT || 6001,
-      forceTLS: import.meta.env.VITE_PUSHER_SCHEME === 'https',
-      encrypted: import.meta.env.VITE_PUSHER_SCHEME === 'https',
-      disableStats: true,
+      broadcaster: 'reverb',
+      key: import.meta.env.VITE_REVERB_APP_KEY || 'akufrsblgemtbdz3a5on',
+      wsHost: import.meta.env.VITE_REVERB_HOST || 'localhost',
+      wsPort: import.meta.env.VITE_REVERB_PORT || 8080,
+      wssPort: import.meta.env.VITE_REVERB_PORT || 8080,
+      forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
       enabledTransports: ['ws', 'wss'],
       authEndpoint: broadcastingAuthEndpoint,
       auth: {
@@ -35,31 +33,53 @@ export function initializeEcho(authToken) {
       }
     })
 
-    // Manejar errores de conexión silenciosamente
+    console.log('✅ Echo initialized for Reverb', {
+      wsHost: import.meta.env.VITE_REVERB_HOST || 'localhost',
+      wsPort: import.meta.env.VITE_REVERB_PORT || 8080,
+      authEndpoint: broadcastingAuthEndpoint
+    })
+
+    // Manejar eventos de conexión
     if (echoInstance && echoInstance.connector && echoInstance.connector.pusher) {
-      echoInstance.connector.pusher.connection.bind('error', (err) => {
-        // Silenciosamente manejar errores de WebSocket
-        // La aplicación funciona sin WebSocket, solo no habrá notificaciones en tiempo real
-        console.debug('WebSocket unavailable - real-time notifications disabled', err.error?.data?.message || '')
+      const connection = echoInstance.connector.pusher.connection
+
+      connection.bind('connecting', () => {
+        console.log('🔄 Connecting to Reverb...')
       })
 
-      echoInstance.connector.pusher.connection.bind('unavailable', () => {
-        console.debug('WebSocket server unavailable - continuing without real-time updates')
+      connection.bind('connected', () => {
+        console.log('✅ Connected to Reverb successfully!')
       })
 
-      echoInstance.connector.pusher.connection.bind('failed', () => {
-        console.debug('WebSocket connection failed - app will work without real-time notifications')
+      connection.bind('error', (err) => {
+        console.error('❌ WebSocket connection error:', err)
+        console.error('Error type:', err?.type)
+        console.error('Error data:', err?.data)
+        console.error('Error code:', err?.data?.code)
+        console.error('Error message:', err?.data?.message)
+      })
+
+      connection.bind('unavailable', () => {
+        console.error('❌ WebSocket server unavailable')
+      })
+
+      connection.bind('failed', () => {
+        console.error('❌ WebSocket connection failed')
+      })
+
+      connection.bind('disconnected', () => {
+        console.warn('⚠️ Disconnected from Reverb')
       })
     }
 
-    console.log('✅ Echo initialized', {
-      wsHost: import.meta.env.VITE_PUSHER_HOST || 'localhost',
-      wsPort: import.meta.env.VITE_PUSHER_PORT || 6001,
-      authEndpoint: broadcastingAuthEndpoint
-    })
     return echoInstance
   } catch (error) {
-    console.debug('Echo initialization failed - continuing without WebSocket', error.message)
+    console.error('❌ Echo initialization failed:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      error: error
+    })
     return null
   }
 }
