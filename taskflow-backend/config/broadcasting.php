@@ -36,17 +36,12 @@ return [
             'secret' => env('REVERB_APP_SECRET'),
             'app_id' => env('REVERB_APP_ID'),
             'options' => [
-                // Host debe ser 'localhost' para que las firmas coincidan con el cliente
-                // El backend se conecta a Reverb via 'reverb:8080' (nombre del contenedor)
-                // pero las firmas deben usar 'localhost' que es lo que el navegador usa
-                'host' => env('REVERB_HOST', 'localhost'),
+                // Para broadcasting HTTP: usar el nombre del contenedor Docker
+                // Laravel Reverb usa estas opciones para construir la URL de conexión HTTP
+                'host' => env('REVERB_SERVER_HOST', 'reverb'),
                 'port' => env('REVERB_PORT', 8080),
                 'scheme' => env('REVERB_SCHEME', 'http'),
                 'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
-            ],
-            'client_options' => [
-                // Guzzle se conecta al contenedor Docker usando el nombre del servicio
-                'base_uri' => env('REVERB_SCHEME', 'http') . '://' . env('REVERB_SERVER_HOST', 'reverb') . ':' . env('REVERB_PORT', 8080),
             ],
         ],
 

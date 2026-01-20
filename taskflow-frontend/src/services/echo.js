@@ -15,15 +15,17 @@ export function initializeEcho(authToken) {
     // Broadcasting auth está bajo /api/broadcasting/auth, no /broadcasting/auth
     const broadcastingAuthEndpoint = apiBaseUrl.replace('/v1', '/broadcasting/auth')
 
-    // Reverb usa el broadcaster 'reverb' que es el broadcaster nativo de Laravel Reverb
+    // Laravel Reverb usa el protocolo de Pusher
     echoInstance = new Echo({
-      broadcaster: 'reverb',
+      broadcaster: 'pusher',
       key: import.meta.env.VITE_REVERB_APP_KEY || 'akufrsblgemtbdz3a5on',
       wsHost: import.meta.env.VITE_REVERB_HOST || 'localhost',
-      wsPort: import.meta.env.VITE_REVERB_PORT || 8080,
-      wssPort: import.meta.env.VITE_REVERB_PORT || 8080,
+      wsPort: import.meta.env.VITE_REVERB_PORT || 80,
+      wssPort: import.meta.env.VITE_REVERB_PORT || 80,
       forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
       enabledTransports: ['ws', 'wss'],
+      disableStats: true,
+      cluster: 'mt1', // Required by Pusher.js (not used by Reverb but required)
       authEndpoint: broadcastingAuthEndpoint,
       auth: {
         headers: {

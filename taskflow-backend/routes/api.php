@@ -51,32 +51,6 @@ Route::prefix('v1')->group(function () {
 // Broadcasting authentication routes
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
-// DEBUG: Ruta temporal para ver qué genera Laravel en broadcasting auth
-Route::post('v1/debug/broadcast-auth', function (\Illuminate\Http\Request $request) {
-    $socketId = $request->input('socket_id');
-    $channelName = $request->input('channel_name');
-
-    $appKey = config('broadcasting.connections.reverb.key');
-    $appSecret = config('broadcasting.connections.reverb.secret');
-    $host = config('broadcasting.connections.reverb.options.host');
-
-    // Generar firma como lo hace Laravel
-    $signature = $socketId . ':' . $channelName;
-    $auth = $appKey . ':' . hash_hmac('sha256', $signature, $appSecret);
-
-    return response()->json([
-        'debug_info' => [
-            'socket_id' => $socketId,
-            'channel_name' => $channelName,
-            'app_key' => $appKey,
-            'host_config' => $host,
-            'signature_string' => $signature,
-            'generated_auth' => $auth,
-            'reverb_config' => config('reverb'),
-        ],
-    ]);
-})->middleware('auth:sanctum');
-
 // ===== NUEVOS MÓDULOS SRP =====
 // Requieren autenticación y verifican roles mediante Policies
 Route::prefix('v1')->group(function () {
