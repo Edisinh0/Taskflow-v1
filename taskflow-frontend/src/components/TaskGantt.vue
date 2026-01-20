@@ -123,8 +123,17 @@ const today = new Date()
 // Aplanar todas las tareas incluyendo subtareas
 const flattenTasks = computed(() => {
   const result = []
+  const seenIds = new Set() // Para evitar duplicados
 
   const addTask = (task) => {
+    // Evitar duplicados: si ya procesamos esta tarea, saltar
+    if (seenIds.has(task.id)) {
+      return
+    }
+
+    // Marcar como procesada
+    seenIds.add(task.id)
+
     // Agregar la tarea principal
     result.push(task)
 
@@ -134,21 +143,18 @@ const flattenTasks = computed(() => {
     }
   }
 
-  // Procesar todas las tareas
-  props.tasks.forEach(task => addTask(task))
+  // Primero, filtrar para obtener solo tareas raíz (sin parent_task_id)
+  // Esto evita que las subtareas aparezcan dos veces: como raíz y dentro del milestone
+  const rootTasks = props.tasks.filter(task => !task.parent_task_id)
+
+  // Procesar solo las tareas raíz (el resto se agregará recursivamente)
+  rootTasks.forEach(task => addTask(task))
 
   // Debug: mostrar info de las tareas
   console.log('TaskGantt - Total tasks received:', props.tasks.length)
-  console.log('TaskGantt - Flattened tasks:', result.length)
+  console.log('TaskGantt - Root tasks:', rootTasks.length)
+  console.log('TaskGantt - Flattened tasks (unique):', result.length)
   console.log('TaskGantt - Tasks with dates:', result.filter(t => isValidDate(t.estimated_start_at) && isValidDate(t.estimated_end_at)).length)
-  if (result.length > 0) {
-    console.log('TaskGantt - First task sample:', {
-      title: result[0].title,
-      estimated_start_at: result[0].estimated_start_at,
-      estimated_end_at: result[0].estimated_end_at,
-      has_subtasks: result[0].subtasks?.length || 0
-    })
-  }
 
   return result
 })
