@@ -85,32 +85,6 @@
         </div>
       </div>
     </transition>
-
-    <!-- Toast Notifications -->
-    <transition-group name="toast" tag="div" class="fixed inset-x-4 top-4 md:inset-x-auto md:right-4 z-[9999] space-y-3 pointer-events-none">
-      <div
-        v-for="toast in toasts"
-        :key="toast.id"
-        :class="[
-          'flex items-start gap-3 min-w-[320px] max-w-md p-4 bg-white dark:bg-slate-800 rounded-xl shadow-lg border-l-4 pointer-events-auto',
-          {
-            'border-rose-500': toast.priority === 'urgent',
-            'border-amber-500': toast.priority === 'high',
-            'border-blue-500': toast.priority === 'medium',
-            'border-emerald-500': toast.priority === 'low'
-          }
-        ]"
-      >
-        <component :is="getNotificationIcon(toast.type)" :size="24" class="flex-shrink-0 mt-0.5 text-slate-600 dark:text-slate-400" />
-        <div class="flex-1 min-w-0">
-          <h4 class="text-sm font-semibold text-slate-900 dark:text-white mb-1">{{ toast.title }}</h4>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ toast.message }}</p>
-        </div>
-        <button @click="removeToast(toast.id)" class="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-          <X :size="20" />
-        </button>
-      </div>
-    </transition-group>
   </div>
 </template>
 
@@ -125,7 +99,6 @@ import {
   ArrowUp,
   Info,
   CheckCircle,
-  X,
   Briefcase,
   RefreshCw
 } from 'lucide-vue-next'
@@ -137,7 +110,6 @@ const showPanel = ref(false)
 
 // Computed
 const notifications = computed(() => notificationsStore.notifications)
-const toasts = computed(() => notificationsStore.toasts)
 const unreadCount = computed(() => notificationsStore.unreadCount)
 const isLoading = computed(() => notificationsStore.isLoading)
 
@@ -195,10 +167,6 @@ async function handleNotificationClick(notification) {
     // router.push({ name: 'task', params: { id: notification.task_id } })
     closePanel()
   }
-}
-
-function removeToast(toastId) {
-  notificationsStore.removeToast(toastId)
 }
 
 function getNotificationIcon(type) {

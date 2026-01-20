@@ -105,8 +105,8 @@ class TaskObserver
 
             // Broadcast event para notificación en tiempo real
             if ($notification) {
-                broadcast(new \App\Events\NotificationSent($notification));
-            }
+    broadcast(new \App\Events\NotificationSent($notification))->toOthers();
+}
         }
     }
 

@@ -12,10 +12,8 @@ export function initializeEcho(authToken) {
 
   try {
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost/api/v1'
-    // Broadcasting auth está bajo /api/broadcasting/auth, no /broadcasting/auth
     const broadcastingAuthEndpoint = apiBaseUrl.replace('/v1', '/broadcasting/auth')
 
-    // Laravel Reverb usa el protocolo de Pusher
     echoInstance = new Echo({
       broadcaster: 'pusher',
       key: import.meta.env.VITE_REVERB_APP_KEY || 'akufrsblgemtbdz3a5on',
@@ -25,7 +23,9 @@ export function initializeEcho(authToken) {
       forceTLS: import.meta.env.VITE_REVERB_SCHEME === 'https',
       enabledTransports: ['ws', 'wss'],
       disableStats: true,
-      cluster: 'mt1', // Required by Pusher.js (not used by Reverb but required)
+      cluster: 'mt1',
+      activityTimeout: 30000, // 30 segundos - mantener conexión viva
+      pongTimeout: 10000, // 10 segundos - timeout para pong
       authEndpoint: broadcastingAuthEndpoint,
       auth: {
         headers: {
@@ -41,7 +41,6 @@ export function initializeEcho(authToken) {
       authEndpoint: broadcastingAuthEndpoint
     })
 
-    // Manejar eventos de conexión
     if (echoInstance && echoInstance.connector && echoInstance.connector.pusher) {
       const connection = echoInstance.connector.pusher.connection
 
@@ -51,6 +50,7 @@ export function initializeEcho(authToken) {
 
       connection.bind('connected', () => {
         console.log('✅ Connected to Reverb successfully!')
+        console.log('📡 Connection ID:', connection.socket_id)
       })
 
       connection.bind('error', (err) => {
@@ -71,6 +71,21 @@ export function initializeEcho(authToken) {
 
       connection.bind('disconnected', () => {
         console.warn('⚠️ Disconnected from Reverb')
+        // 🔧 NUEVO: Intentar reconectar automáticamente
+        setTimeout(() => {
+          console.log('🔄 Attempting to reconnect...')
+          if (echoInstance && echoInstance.connector && echoInstance.connector.pusher) {
+            echoInstance.connector.pusher.connect()
+          }
+        }, 3000) // Intentar reconectar después de 3 segundos
+      })
+
+      // 🔧 NUEVO: Listener para estado de conexión
+      connection.bind('state_change', (states) => {
+        console.log('🔄 Connection state changed:', {
+          previous: states.previous,
+          current: states.current
+        })
       })
     }
 

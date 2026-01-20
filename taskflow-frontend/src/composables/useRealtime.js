@@ -7,10 +7,14 @@ import { getEcho } from '@/services/echo'
  * @param {object} events - Objeto con eventos y sus handlers
  * @returns {object} Estado de la conexión y método para conectar
  */
+// Cache global de canales para evitar múltiples suscripciones
+const channelCache = new Map()
+
 export function useRealtime(channelName, events = {}) {
   const isConnected = ref(false)
   const channel = ref(null)
   const error = ref(null)
+  const listenerIds = ref([])
 
   const connect = () => {
     try {
@@ -21,29 +25,45 @@ export function useRealtime(channelName, events = {}) {
         return
       }
 
-      // Subscribe to channel
-      channel.value = echo.private(channelName)
+      // Verificar si ya existe una suscripción activa para este canal
+      if (channelCache.has(channelName)) {
+        console.log(`♻️ Reutilizando canal existente: ${channelName}`)
+        channel.value = channelCache.get(channelName)
+      } else {
+        console.log(`🆕 Creando nuevo canal: ${channelName}`)
+        // Subscribe to channel
+        channel.value = echo.private(channelName)
 
-      // Debug: Acceder al Pusher connection directamente para ver TODOS los eventos
-      if (echo.connector && echo.connector.pusher) {
-        const pusherChannel = echo.connector.pusher.channel(`private-${channelName}`)
-        if (pusherChannel) {
-          pusherChannel.bind_global((eventName, data) => {
-            console.log('🌍 [PUSHER GLOBAL] Evento capturado:', eventName, data)
-          })
+        // Guardar en cache
+        channelCache.set(channelName, channel.value)
+
+        // Debug: Acceder al Pusher connection directamente para ver TODOS los eventos
+        if (echo.connector && echo.connector.pusher) {
+          const pusherChannel = echo.connector.pusher.channel(`private-${channelName}`)
+          if (pusherChannel) {
+            pusherChannel.bind_global((eventName, data) => {
+              console.log('🌍 [PUSHER GLOBAL] Evento capturado:', eventName, data)
+            })
+          }
         }
       }
 
-      // Register event listeners
+      // Register event listeners (SIEMPRE, incluso si el canal ya existe)
       Object.keys(events).forEach((eventName) => {
         // Laravel Echo requiere punto al inicio para eventos personalizados (no Pusher defaults)
         const fullEventName = eventName.startsWith('.') ? eventName : `.${eventName}`
         console.log(`👂 Registrando listener para evento: ${fullEventName} en canal: ${channelName}`)
-        channel.value.listen(fullEventName, (data) => {
+
+        // Crear listener wrapper para poder removerlo después
+        const listenerId = `${channelName}-${eventName}-${Date.now()}`
+        const listener = (data) => {
           console.log(`📨 Evento recibido: ${fullEventName}`, data)
           console.log(`📦 Datos completos:`, JSON.stringify(data, null, 2))
           events[eventName](data)
-        })
+        }
+
+        channel.value.listen(fullEventName, listener)
+        listenerIds.value.push({ eventName: fullEventName, listener, id: listenerId })
       })
 
       isConnected.value = true
@@ -56,16 +76,23 @@ export function useRealtime(channelName, events = {}) {
 
   const disconnect = () => {
     if (channel.value) {
-      const echo = getEcho()
-      if (echo) {
-        echo.leave(channelName)
-      }
+      // Remover solo los listeners de este composable, no todo el canal
+      listenerIds.value.forEach(({ eventName, listener }) => {
+        try {
+          channel.value.stopListening(eventName, listener)
+          console.log(`🔇 Listener removido: ${eventName}`)
+        } catch (err) {
+          console.warn(`⚠️ Error removiendo listener ${eventName}:`, err)
+        }
+      })
+
+      listenerIds.value = []
       isConnected.value = false
-      console.log(`🔌 Disconnected from channel: ${channelName}`)
+      console.log(`🔌 Listeners disconnected from channel: ${channelName} (canal sigue activo)`)
     }
   }
 
-  // Auto-disconnect on unmount
+  // Auto-disconnect on unmount (solo los listeners, no el canal completo)
   onUnmounted(() => {
     disconnect()
   })

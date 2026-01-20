@@ -138,10 +138,8 @@ class FlowController extends Controller
             }
         }
 
-        // Notificar al responsable si fue asignado
-        if ($flow->responsible_id) {
-            \App\Services\NotificationService::flowAssigned($flow);
-        }
+        // El Observer se encargará de notificar automáticamente (FlowObserver::created)
+        // No necesitamos llamar manualmente al servicio aquí
 
         return response()->json([
             'success' => true,
