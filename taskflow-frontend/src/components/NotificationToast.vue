@@ -66,7 +66,8 @@ import {
   Trophy,
   Briefcase,
   RefreshCw,
-  Bell
+  Bell,
+  Calendar
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -135,7 +136,8 @@ const getNotificationIcon = (type) => {
     task_unblocked: Unlock,
     milestone_completed: Trophy,
     flow_assigned: Briefcase,
-    flow_responsible_changed: RefreshCw
+    flow_responsible_changed: RefreshCw,
+    task_date_changed: Calendar
   }
   return icons[type] || Bell
 }
@@ -150,7 +152,8 @@ const getNotificationIconClass = (type) => {
     task_unblocked: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border border-emerald-200 dark:border-emerald-500/20',
     milestone_completed: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-500 border border-purple-200 dark:border-purple-500/20',
     flow_assigned: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-200 dark:border-blue-500/20',
-    flow_responsible_changed: 'bg-slate-100 dark:bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20'
+    flow_responsible_changed: 'bg-slate-100 dark:bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20',
+    task_date_changed: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-200 dark:border-blue-500/20'
   }
   return classes[type] || 'bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600/30'
 }

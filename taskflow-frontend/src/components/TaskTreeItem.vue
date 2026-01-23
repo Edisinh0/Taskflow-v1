@@ -37,6 +37,13 @@
           <!-- Badges de estado -->
           <div class="flex flex-col items-end space-y-2 flex-shrink-0">
             <div class="flex flex-col space-y-1.5 items-end">
+              <!-- Alerta SLA (PRIORIDAD MÁXIMA - se muestra primero) -->
+              <SLAAlertBadge
+                v-if="slaAlertStatus"
+                :alert-type="slaAlertStatus"
+                :days-overdue="daysOverdue"
+              />
+
               <!-- Días Restantes (oculto si completada) -->
               <span v-if="task.status !== 'completed'" class="px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 hover:scale-105" :class="getDaysRemainingClass(task.estimated_end_at)">
                 {{ getDaysRemaining(task.estimated_end_at) }}
@@ -199,9 +206,10 @@
 <script setup>
 import { defineProps, defineEmits, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { 
-  GripVertical, User, ListTodo, Pencil, Link, Trash2, 
-  Lock, CheckCircle2, RotateCw, PauseCircle, ClipboardList, Target, Paperclip, TrendingUp 
+import SLAAlertBadge from './SLAAlertBadge.vue'
+import {
+  GripVertical, User, ListTodo, Pencil, Link, Trash2,
+  Lock, CheckCircle2, RotateCw, PauseCircle, ClipboardList, Target, Paperclip, TrendingUp
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -221,6 +229,35 @@ const authStore = useAuthStore()
 const canEdit = computed(() => {
   const role = authStore.user?.role
   return ['admin', 'project_manager', 'pm'].includes(role)
+})
+
+// Calcular estado de alerta SLA
+const slaAlertStatus = computed(() => {
+  if (!props.task.sla_due_date) return null
+  if (props.task.status === 'completed' || props.task.status === 'cancelled') return null
+
+  const now = new Date()
+  const dueDate = new Date(props.task.sla_due_date)
+  const hoursOverdue = (now - dueDate) / (1000 * 60 * 60)
+
+  // Si es negativo o 0, aún no ha vencido
+  if (hoursOverdue < 0) return null
+
+  if (hoursOverdue >= 48) return 'escalation'
+  if (hoursOverdue >= 24) return 'warning'
+  return null
+})
+
+// Calcular días de atraso
+const daysOverdue = computed(() => {
+  if (!slaAlertStatus.value) return 0
+  if (!props.task.sla_due_date) return 0
+
+  const now = new Date()
+  const dueDate = new Date(props.task.sla_due_date)
+  const days = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24))
+
+  return Math.max(0, days)
 })
 
 // Funciones handler para evitar problemas de propagación

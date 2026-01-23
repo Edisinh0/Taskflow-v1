@@ -26,6 +26,18 @@ class TaskObserver
             $task->last_updated_by = auth()->id();
         }
 
+        // ✅ NUEVO: Auto-asignar sla_due_date desde estimated_end_at si no está definido
+        // Esto asegura que TODAS las tareas con fecha estimada tengan SLA automático
+        if (!$task->sla_due_date && $task->estimated_end_at) {
+            $task->sla_due_date = $task->estimated_end_at;
+            Log::info('📅 Auto-asignando sla_due_date desde estimated_end_at', [
+                'task_id' => $task->id ?? 'new',
+                'title' => $task->title ?? 'Sin título',
+                'estimated_end_at' => $task->estimated_end_at,
+                'sla_due_date' => $task->sla_due_date,
+            ]);
+        }
+
         // Capture old assignee for updates before returning
         if ($task->exists && $task->isDirty('assignee_id')) {
             self::$previousAssignees[$task->id] = $task->getOriginal('assignee_id');
@@ -41,12 +53,13 @@ class TaskObserver
             // Usar el método unificado del modelo
             $task->is_blocked = $task->checkIsBlocked();
 
-            // IMPORTANTE: Si la tarea está bloqueada, cambiar el status a 'blocked'
+            // IMPORTANTE: Si la tarea está bloqueada, establecer blocked_reason (NO cambiar status)
+            // El status sigue siendo 'pending' pero is_blocked = true indica que no se puede ejecutar
             if ($task->is_blocked && !in_array($task->status, ['completed', 'cancelled'])) {
-                $task->status = 'blocked';
                 $task->blocked_reason = 'Esperando tareas precedentes';
-                Log::info("🔒 Tarea creada con status 'blocked' por dependencias", [
+                Log::info("🔒 Tarea creada bloqueada por dependencias (is_blocked=true)", [
                     'title' => $task->title,
+                    'status' => $task->status,
                     'depends_on_task_id' => $task->depends_on_task_id,
                     'depends_on_milestone_id' => $task->depends_on_milestone_id,
                 ]);
@@ -263,6 +276,9 @@ class TaskObserver
             unset(self::$previousAssignees[$task->id]);
         }
 
+        // NUEVO: Detectar cambios de fechas
+        $this->checkDateChanges($task);
+
         // 1. Solo actuamos si el estado cambió A 'completed'
         if ($task->isDirty('status') && $task->status === 'completed') {
             Log::info('✅ Tarea completada, liberando dependientes', [
@@ -276,6 +292,11 @@ class TaskObserver
             // 🔔 Si es milestone, generar notificación especial
             if ($task->is_milestone) {
                 NotificationService::milestoneCompleted($task);
+            }
+
+            // 🔔 Resolver alertas SLA automáticamente
+            if (config('sla.auto_resolve', true)) {
+                $this->resolveSLAAlerts($task);
             }
 
             // 2. Buscar tareas que dependían de esta (como tarea precedente)
@@ -498,6 +519,227 @@ class TaskObserver
 
             $task->update($updateData);
             Log::info("🔓 Tarea {$task->id} desbloqueada completamente.", $updateData);
+        }
+    }
+
+    /**
+     * Resolver alertas SLA cuando la tarea se completa
+     * Regla 4: Resolución Automática
+     */
+    private function resolveSLAAlerts(Task $task): void
+    {
+        Log::info('🔔 Resolviendo alertas SLA para tarea completada', [
+            'task_id' => $task->id,
+            'title' => $task->title,
+        ]);
+
+        // Buscar todas las notificaciones SLA pendientes para esta tarea
+        $slaNotifications = \App\Models\Notification::where('task_id', $task->id)
+            ->whereIn('type', ['sla_warning', 'sla_escalation', 'sla_escalation_notice'])
+            ->where('is_read', false)
+            ->get();
+
+        $resolvedCount = 0;
+
+        foreach ($slaNotifications as $notification) {
+            // Marcar como leída (resolver visualmente)
+            $notification->update([
+                'is_read' => true,
+                'read_at' => now(),
+            ]);
+
+            $resolvedCount++;
+        }
+
+        if ($resolvedCount > 0) {
+            Log::info("✅ {$resolvedCount} alertas SLA resueltas automáticamente para tarea {$task->id}");
+
+            // Crear notificación de resolución para el asignado
+            if ($task->assignee_id) {
+                $resolutionNotification = \App\Models\Notification::create([
+                    'user_id' => $task->assignee_id,
+                    'task_id' => $task->id,
+                    'flow_id' => $task->flow_id,
+                    'type' => 'sla_resolved',
+                    'title' => '✅ SLA Resuelto',
+                    'message' => "La tarea '{$task->title}' fue completada exitosamente.",
+                    'priority' => 'low',
+                    'data' => [
+                        'task_id' => $task->id,
+                        'task_title' => $task->title,
+                        'resolved_at' => now()->toIso8601String(),
+                        'alerts_resolved' => $resolvedCount,
+                    ],
+                    'is_read' => false,
+                ]);
+
+                // Broadcast notificación de resolución
+                broadcast(new \App\Events\NotificationSent($resolutionNotification))->toOthers();
+
+                // Si hubo escalación, también notificar al supervisor
+                if ($slaNotifications->where('type', 'sla_escalation')->count() > 0) {
+                    $supervisor = $task->getSupervisor();
+
+                    if ($supervisor && $supervisor->id !== $task->assignee_id) {
+                        $supervisorResolution = \App\Models\Notification::create([
+                            'user_id' => $supervisor->id,
+                            'task_id' => $task->id,
+                            'flow_id' => $task->flow_id,
+                            'type' => 'sla_resolved',
+                            'title' => '✅ SLA Escalado Resuelto',
+                            'message' => "La tarea escalada '{$task->title}' fue completada por {$task->assignee->name}.",
+                            'priority' => 'low',
+                            'data' => [
+                                'task_id' => $task->id,
+                                'task_title' => $task->title,
+                                'resolved_by' => $task->assignee?->name,
+                                'resolved_at' => now()->toIso8601String(),
+                            ],
+                            'is_read' => false,
+                        ]);
+
+                        broadcast(new \App\Events\NotificationSent($supervisorResolution))->toOthers();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Detectar cambios en campos de fecha
+     * Sistema de Notificaciones Automáticas para Cambios de Fecha
+     */
+    private function checkDateChanges(Task $task): void
+    {
+        $dateFields = [
+            'estimated_start_at',
+            'estimated_end_at',
+            'actual_start_at',
+            'actual_end_at',
+            'sla_due_date',
+            'milestone_target_date',
+        ];
+
+        foreach ($dateFields as $field) {
+            if ($task->wasChanged($field)) {
+                $oldValue = $task->getOriginal($field);
+                $newValue = $task->{$field};
+
+                Log::info(' Cambio de fecha detectado', [
+                    'task_id' => $task->id,
+                    'field' => $field,
+                    'old_value' => $oldValue,
+                    'new_value' => $newValue,
+                ]);
+
+                // Disparar evento para broadcasting
+                event(new \App\Events\TaskDateChanged($task, $field, $oldValue, $newValue));
+
+                // Crear notificación
+                $this->notifyDateChange($task, $field, $oldValue, $newValue);
+            }
+        }
+    }
+
+    /**
+     * Crear notificación de cambio de fecha
+     */
+    private function notifyDateChange(Task $task, string $field, $oldDate, $newDate): void
+    {
+        // Solo notificar si hay un asignado
+        if (!$task->assignee_id) {
+            return;
+        }
+
+        // Obtener el nombre del campo legible
+        $fieldNames = [
+            'estimated_start_at' => 'Fecha estimada de inicio',
+            'estimated_end_at' => 'Fecha estimada de finalización',
+            'actual_start_at' => 'Fecha real de inicio',
+            'actual_end_at' => 'Fecha real de finalización',
+            'sla_due_date' => 'Fecha de vencimiento SLA',
+            'milestone_target_date' => 'Fecha objetivo del milestone',
+        ];
+
+        $fieldLabel = $fieldNames[$field] ?? $field;
+
+        // Formato para mostrar
+        $oldDateFormatted = $oldDate ? \Carbon\Carbon::parse($oldDate)->format('d/m/Y H:i') : 'Sin fecha';
+        $newDateFormatted = $newDate ? \Carbon\Carbon::parse($newDate)->format('d/m/Y H:i') : 'Sin fecha';
+
+        // Crear mensaje
+        $message = "La {$fieldLabel} de '{$task->title}' fue actualizada de {$oldDateFormatted} a {$newDateFormatted}";
+
+        // Calcular prioridad según cercanía de la nueva fecha
+        $priority = $this->calculateDateChangePriority($field, $oldDate, $newDate);
+
+        // Crear notificación
+        $notification = \App\Models\Notification::create([
+            'user_id' => $task->assignee_id,
+            'task_id' => $task->id,
+            'flow_id' => $task->flow_id,
+            'type' => 'task_date_changed',
+            'title' => " Cambio de fecha: {$fieldLabel}",
+            'message' => $message,
+            'priority' => $priority,
+            'is_read' => false,
+            'data' => [
+                'field' => $field,
+                'field_label' => $fieldLabel,
+                'old_date' => $oldDate,
+                'new_date' => $newDate,
+                'old_formatted' => $oldDateFormatted,
+                'new_formatted' => $newDateFormatted,
+                'changed_by_user_id' => auth()->id(),
+                'changed_by_user_name' => auth()->user()?->name,
+                'changed_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        // Broadcast en tiempo real
+        broadcast(new \App\Events\NotificationSent($notification))->toOthers();
+
+        Log::info('✅ Notificación de cambio de fecha creada', [
+            'notification_id' => $notification->id,
+            'type' => 'task_date_changed',
+            'priority' => $priority,
+        ]);
+    }
+
+    /**
+     * Calcular prioridad según qué tan cercana es la fecha
+     */
+    private function calculateDateChangePriority(string $field, $oldDate, $newDate): string
+    {
+        // Si la fecha es SLA, siempre es importante
+        if ($field === 'sla_due_date') {
+            return 'high';
+        }
+
+        // Si no hay nueva fecha, prioridad media
+        if (!$newDate) {
+            return 'medium';
+        }
+
+        try {
+            $now = now();
+            $date = \Carbon\Carbon::parse($newDate);
+            $hoursUntil = $now->diffInHours($date, false);
+
+            // Si la nueva fecha ya pasó o es muy cercana (< 24 horas)
+            if ($hoursUntil < 24) {
+                return 'urgent';
+            }
+
+            // Si la nueva fecha es dentro de 1 semana
+            if ($hoursUntil < 168) { // 7 * 24 = 168 horas
+                return 'high';
+            }
+
+            return 'medium';
+        } catch (\Exception $e) {
+            Log::error('Error calculando prioridad de cambio de fecha: ' . $e->getMessage());
+            return 'medium';
         }
     }
 }

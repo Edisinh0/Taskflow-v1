@@ -224,17 +224,17 @@ class TaskDependencyController extends Controller
 
         $isBlocked = $this->isTaskBlocked($task);
 
-        if ($isBlocked && $task->status !== 'blocked' && $task->status !== 'completed') {
+        if ($isBlocked && !$task->is_blocked && $task->status !== 'completed') {
             $blockingTasks = $this->getBlockingTasks($task);
             $reasons = array_column($blockingTasks, 'reason');
-            
+
             $task->update([
-                'status' => 'blocked',
+                'is_blocked' => true,
                 'blocked_reason' => implode('. ', $reasons),
             ]);
-        } elseif (!$isBlocked && $task->status === 'blocked') {
+        } elseif (!$isBlocked && $task->is_blocked) {
             $task->update([
-                'status' => 'pending',
+                'is_blocked' => false,
                 'blocked_reason' => null,
             ]);
         }

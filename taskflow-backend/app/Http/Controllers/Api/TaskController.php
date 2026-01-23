@@ -207,15 +207,18 @@ class TaskController extends Controller
         'description' => 'nullable|string',
         'status' => ['sometimes', 'string', Rule::in(['pending', 'in_progress', 'completed', 'paused', 'cancelled'])],
         'assignee_id' => 'nullable|exists:users,id',
+        'estimated_start_at' => 'nullable|date',
         'estimated_end_at' => 'nullable|date',
         'is_milestone' => 'sometimes|boolean',
         'allow_attachments' => 'sometimes|boolean',
         'order' => 'sometimes|integer|min:0',
         'depends_on_task_id' => 'nullable|exists:tasks,id',
         'depends_on_milestone_id' => 'nullable|exists:tasks,id',
+        'parent_task_id' => 'nullable|exists:tasks,id',
         'progress' => 'sometimes|integer|min:0|max:100',
         'priority' => ['sometimes', 'string', Rule::in(['low', 'medium', 'high', 'urgent'])],
-        'notes' => 'nullable|string', // <-- Permitir notas
+        'notes' => 'nullable|string',
+        'blocked_reason' => 'nullable|string',
     ]);
 
     // 🎯 MOTOR DE CONTROL DE FLUJOS (Lógica de Bloqueo y Requisitos)
@@ -223,33 +226,34 @@ class TaskController extends Controller
         // ⚠️ IMPORTANTE: Refrescar desde BD para obtener el valor actualizado de is_blocked
         $task->refresh();
         $newStatus = $validated['status'];
-        
-        // 1. Verificar Bloqueo
-        if ($task->is_blocked) {
-            // Si intenta iniciarla o finalizarla estando bloqueada
+        $currentStatus = $task->status;
+
+        // 1. Verificar Bloqueo - SOLO si intenta CAMBIAR el estado a in_progress o completed
+        if ($task->is_blocked && $currentStatus !== $newStatus) {
+            // Si intenta iniciarla o finalizarla estando bloqueada Y el estado es diferente al actual
             if (in_array($newStatus, ['in_progress', 'completed'])) {
-                
+
                 // Generar mensaje detallado del bloqueo
                 $blockingReasons = [];
-                
+
                 if ($task->depends_on_task_id) {
                     $precedentTask = Task::find($task->depends_on_task_id);
                     if ($precedentTask && $precedentTask->status !== 'completed') {
                         $blockingReasons[] = "la tarea '{$precedentTask->title}' (ID: {$precedentTask->id})";
                     }
                 }
-                
+
                 if ($task->depends_on_milestone_id) {
                     $milestone = Task::find($task->depends_on_milestone_id);
                     if ($milestone && $milestone->status !== 'completed') {
                         $blockingReasons[] = "el milestone '{$milestone->title}' (ID: {$milestone->id})";
                     }
                 }
-                
+
                 $blockMessage = !empty($blockingReasons)
                     ? "Esta tarea está bloqueada. Debe completarse " . implode(' y ', $blockingReasons) . " primero."
                     : "Esta tarea está bloqueada por dependencias no cumplidas.";
-                
+
                 return response()->json([
                     'success' => false,
                     'message' => "🔒 Acción prohibida: {$blockMessage}",

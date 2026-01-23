@@ -111,7 +111,6 @@
                   <option value="pending">Pendiente</option>
                   <option value="in_progress">En Progreso</option>
                   <option value="completed">Completada</option>
-                  <option value="blocked">Bloqueada</option>
                   <option value="paused">Pausada</option>
                   <option value="cancelled">Cancelada</option>
                 </select>
@@ -142,20 +141,6 @@
                   </span>
                 </div>
               </div>
-            </div>
-
-            <!-- Razón de bloqueo -->
-            <div v-if="formData.status === 'blocked'" class="mb-5">
-              <label class="block text-sm font-bold text-rose-500 dark:text-rose-400 mb-2">
-                Razón del Bloqueo <span class="text-rose-500">*</span>
-              </label>
-              <textarea
-                v-model="formData.blocked_reason"
-                required
-                rows="2"
-                class="w-full px-4 py-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-500/30 rounded-xl text-rose-900 dark:text-white placeholder-rose-300 dark:placeholder-rose-300/50 focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
-                placeholder="Explica por qué está bloqueada..."
-              ></textarea>
             </div>
 
             <!-- Milestone Checkbox -->
@@ -333,13 +318,19 @@ const formatDBDate = (dateStr) => {
 watch([() => props.task, () => props.flowId, () => props.initialData], ([newTask, newFlowId, newInitialData]) => {
   if (newTask) {
     // Cargar datos de tarea existente (Modo Edición)
+    // IMPORTANTE: Convertir status='blocked' a 'pending' si existe (legacy data)
+    let taskStatus = newTask.status || 'pending'
+    if (taskStatus === 'blocked') {
+      taskStatus = 'pending'
+    }
+
     formData.value = {
       title: newTask.title || '',
       description: newTask.description || '',
       notes: newTask.notes || '',
       assignee_id: newTask.assignee_id || null,
       priority: newTask.priority || 'medium',
-      status: newTask.status || 'pending',
+      status: taskStatus,
       progress: newTask.progress || 0,
       is_milestone: newTask.is_milestone || false,
       allow_attachments: newTask.allow_attachments || false,
@@ -410,7 +401,17 @@ const handleSubmit = async () => {
 
     if (isEditMode.value) {
       // Actualizar tarea existente
-      await tasksAPI.update(props.task.id, formData.value)
+      // Limpiar campos vacíos para evitar errores de validación
+      const dataToUpdate = { ...formData.value }
+
+      // Convertir strings vacíos a null para campos opcionales
+      if (dataToUpdate.estimated_start_at === '') dataToUpdate.estimated_start_at = null
+      if (dataToUpdate.estimated_end_at === '') dataToUpdate.estimated_end_at = null
+      if (dataToUpdate.blocked_reason === '') dataToUpdate.blocked_reason = null
+      if (dataToUpdate.notes === '') dataToUpdate.notes = null
+      if (dataToUpdate.description === '') dataToUpdate.description = null
+
+      await tasksAPI.update(props.task.id, dataToUpdate)
     } else {
       // Crear nueva tarea
       // Preparar datos para envío - remover status si es el default para que backend lo determine

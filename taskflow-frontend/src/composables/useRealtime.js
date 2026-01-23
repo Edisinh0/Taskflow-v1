@@ -145,3 +145,14 @@ export function useFlowUpdates(flowId, onUpdate) {
     'task.updated': onUpdate
   })
 }
+
+/**
+ * Composable para escuchar cambios de fecha en tareas
+ * @param {number} userId - ID del usuario
+ * @param {function} onDateChange - Callback cuando cambia una fecha
+ */
+export function useTaskDateChanges(userId, onDateChange) {
+  return useRealtime(`users.${userId}`, {
+    'TaskDateChanged': onDateChange
+  })
+}

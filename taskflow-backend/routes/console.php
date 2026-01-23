@@ -9,8 +9,9 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Programar verificación de SLA de tareas
-// Ejecuta cada hora para verificar tareas vencidas y próximas a vencer
-Schedule::command('sla:check')
+// Ejecuta cada hora para verificar tareas vencidas (+1 día warning, +2 días escalación)
+Schedule::command('sla:check --details')
     ->hourly()
     ->withoutOverlapping() // Evita ejecuciones simultáneas
+    ->name('sla-alerts-check') // Nombre identificador
     ->runInBackground(); // Ejecuta en segundo plano

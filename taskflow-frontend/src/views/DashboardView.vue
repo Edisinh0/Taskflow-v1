@@ -226,30 +226,57 @@
         <div class="bg-white dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-sm dark:shadow-lg border border-slate-200 dark:border-white/5 flex flex-col">
           <div class="px-6 py-4 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
             <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center">
-                <span class="w-2 h-2 rounded-full bg-rose-500 mr-2 animate-pulse"></span>
+                <Zap class="w-5 h-5 mr-2 text-rose-500 animate-pulse" :stroke-width="2.5" fill="currentColor" />
                 Tareas Urgentes
             </h3>
             <span class="text-xs font-semibold bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 px-2 py-1 rounded-md border border-rose-100 dark:border-rose-500/20">
-                {{ urgentTasks.length }} pendientes
+                {{ computedUrgentTasks.length }} pendientes
             </span>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-white/5">
             <router-link
-              v-for="task in urgentTasks"
+              v-for="task in computedUrgentTasks"
               :key="task.id"
               :to="`/flows/${task.flow_id}`"
               class="block px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer transition-colors group"
             >
               <div class="flex items-start justify-between mb-2">
                 <div class="flex-1">
-                  <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ task.title }}</h4>
+                  <div class="flex items-center gap-2 mb-1">
+                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ task.title }}</h4>
+                    <!-- Badge SLA si la tarea tiene SLA vencido -->
+                    <SLAAlertBadge
+                      v-if="getSLAStatus(task)"
+                      :alert-type="getSLAStatus(task)"
+                      :days-overdue="getDaysOverdue(task)"
+                      class="shrink-0"
+                    />
+                    <!-- Badge de prioridad urgente (solo si no tiene SLA vencido) -->
+                    <span
+                      v-else-if="task.priority === 'urgent'"
+                      class="px-2 py-0.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold uppercase tracking-wider rounded-full border border-rose-200 dark:border-rose-500/20 inline-flex items-center gap-1"
+                    >
+                      <Flame :size="12" :stroke-width="2.5" />
+                      <span>Urgente</span>
+                    </span>
+                  </div>
                   <p class="text-xs text-slate-500 mt-1 flex items-center">
-                    <svg class="w-3 h-3 mr-1 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    <FolderOpen class="w-3 h-3 mr-1 opacity-50" stroke-width="2" />
                     {{ task.flow?.name }}
                   </p>
                 </div>
-                <span class="px-2.5 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-100 dark:border-rose-500/20 shadow-sm shrink-0 ml-3">
-                  {{ getDaysRemaining(task.estimated_end_at) }}
+                <span
+                  :class="[
+                    'px-2.5 py-1 text-xs font-bold rounded-lg border shadow-sm shrink-0 ml-3 inline-flex items-center gap-1',
+                    getSLAStatus(task) === 'escalation' ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20' :
+                    getSLAStatus(task) === 'warning' ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' :
+                    'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20'
+                  ]"
+                >
+                  <AlertCircle v-if="getSLAStatus(task) === 'escalation'" :size="14" :stroke-width="2.5" />
+                  <Clock v-else-if="getSLAStatus(task) === 'warning'" :size="14" :stroke-width="2.5" />
+                  <CalendarClock v-else :size="14" :stroke-width="2.5" />
+                  <span>{{ getDaysRemaining(task.estimated_end_at) }}</span>
                 </span>
               </div>
               <div class="flex items-center gap-4 text-[10px] text-slate-400">
@@ -258,7 +285,7 @@
                 <span>Término: {{ formatDate(task.estimated_end_at) }}</span>
               </div>
             </router-link>
-            <div v-if="urgentTasks.length === 0" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
+            <div v-if="computedUrgentTasks.length === 0" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
                 ¡Todo bajo control! No hay tareas urgentes.
             </div>
           </div>
@@ -315,8 +342,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useUserNotifications } from '@/composables/useRealtime'
 import { flowsAPI, tasksAPI } from '@/services/api'
 import { Line, Doughnut } from 'vue-chartjs'
 import {
@@ -331,7 +359,8 @@ import {
   Title
 } from 'chart.js'
 import Navbar from '@/components/AppNavbar.vue'
-import { Rocket, Folder } from 'lucide-vue-next'
+import SLAAlertBadge from '@/components/SLAAlertBadge.vue'
+import { Rocket, Folder, FolderOpen, Flame, Clock, AlertCircle, CalendarClock, Zap } from 'lucide-vue-next'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Title)
 
@@ -349,9 +378,73 @@ const stats = ref({
   completionRate: 0
 })
 
-const urgentTasks = ref([])
+const allTasksData = ref([]) // Todas las tareas sin filtrar
 const recentFlows = ref([])
 const allTasks = ref([])
+
+// Computed para calcular el estado SLA de una tarea
+const getSLAStatus = (task) => {
+  if (!task.sla_due_date) return null
+  if (task.status === 'completed' || task.status === 'cancelled') return null
+
+  const now = new Date()
+  const dueDate = new Date(task.sla_due_date)
+  const hoursOverdue = (now - dueDate) / (1000 * 60 * 60)
+
+  if (hoursOverdue < 0) return null
+  if (hoursOverdue >= 48) return 'escalation'
+  if (hoursOverdue >= 24) return 'warning'
+  return null
+}
+
+// Computed para calcular días de atraso
+const getDaysOverdue = (task) => {
+  if (!task.sla_due_date) return 0
+
+  const now = new Date()
+  const dueDate = new Date(task.sla_due_date)
+  const days = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24))
+
+  return Math.max(0, days)
+}
+
+// Computed para obtener tareas urgentes (incluyendo SLA atrasadas)
+const computedUrgentTasks = computed(() => {
+  const tasks = allTasksData.value.filter(t => {
+    // Excluir tareas completadas
+    if (t.status === 'completed' || t.status === 'cancelled') return false
+
+    // Incluir tareas con SLA vencido
+    const slaStatus = getSLAStatus(t)
+    if (slaStatus) return true
+
+    // Incluir tareas con prioridad urgente
+    if (t.priority === 'urgent') return true
+
+    return false
+  })
+
+  // Ordenar por criticidad:
+  // 1. SLA escalation (48+ horas)
+  // 2. SLA warning (24+ horas)
+  // 3. Prioridad urgent
+  return tasks.sort((a, b) => {
+    const slaA = getSLAStatus(a)
+    const slaB = getSLAStatus(b)
+
+    // Prioridad a escalations
+    if (slaA === 'escalation' && slaB !== 'escalation') return -1
+    if (slaB === 'escalation' && slaA !== 'escalation') return 1
+
+    // Luego warnings
+    if (slaA === 'warning' && slaB !== 'warning') return -1
+    if (slaB === 'warning' && slaA !== 'warning') return 1
+
+    // Finalmente por prioridad
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 }
+    return (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3)
+  }).slice(0, 10) // Limitar a 10 tareas más urgentes
+})
 
 const taskTrendData = ref({
   labels: [],
@@ -603,63 +696,68 @@ const calculateProgress = (flow) => {
 
 const loadData = async () => {
   try {
-    const [flowsRes, tasksRes] = await Promise.all([
+    const [flowsRes, tasksRes, allTasksRes] = await Promise.all([
       flowsAPI.getAll(),
-      tasksAPI.getAll({ assignee_id: authStore.currentUser?.id })
+      tasksAPI.getAll({ assignee_id: authStore.currentUser?.id }),
+      tasksAPI.getAll() // Obtener TODAS las tareas para el grid de "Tareas Urgentes"
     ])
 
     const flows = flowsRes.data.data
-    const tasks = tasksRes.data.data
+    const userTasks = tasksRes.data.data // Tareas del usuario actual (para stats y "Mis Tareas")
+    const allTasksFromAPI = allTasksRes.data.data // Todas las tareas del sistema (para grid urgentes)
 
     stats.value = {
       activeFlows: flows.filter(f => f.status === 'active').length,
-      pendingTasks: tasks.filter(t => ['pending', 'in_progress'].includes(t.status)).length,
-      completedToday: tasks.filter(t => t.status === 'completed' && isToday(t.updated_at)).length,
-      overdueTasks: tasks.filter(t => t.estimated_end_at && new Date(t.estimated_end_at) < new Date() && t.status !== 'completed').length,
-      urgentTasks: tasks.filter(t => t.priority === 'urgent' && t.status !== 'completed').length,
+      pendingTasks: userTasks.filter(t => ['pending', 'in_progress'].includes(t.status)).length,
+      completedToday: userTasks.filter(t => t.status === 'completed' && isToday(t.updated_at)).length,
+      overdueTasks: userTasks.filter(t => t.estimated_end_at && new Date(t.estimated_end_at) < new Date() && t.status !== 'completed').length,
+      // Incluir tareas con priority=urgent O con SLA vencido
+      urgentTasks: userTasks.filter(t => {
+        if (t.status === 'completed' || t.status === 'cancelled') return false
+        return t.priority === 'urgent' || t.sla_breached === true || t.sla_days_overdue > 0
+      }).length,
       flowsThisWeek: flows.filter(f => isThisWeek(f.created_at)).length,
-      completedThisWeek: tasks.filter(t => t.status === 'completed' && isThisWeek(t.updated_at)).length,
-      totalThisWeek: tasks.filter(t => isThisWeek(t.created_at)).length,
-      completionRate: Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100) || 0
+      completedThisWeek: userTasks.filter(t => t.status === 'completed' && isThisWeek(t.updated_at)).length,
+      totalThisWeek: userTasks.filter(t => isThisWeek(t.created_at)).length,
+      completionRate: Math.round((userTasks.filter(t => t.status === 'completed').length / userTasks.length) * 100) || 0
     }
 
-    urgentTasks.value = tasks
-      .filter(t => t.priority === 'urgent' && t.status !== 'completed')
-      .slice(0, 5)
+    // Guardar TODAS las tareas del sistema para computedUrgentTasks
+    allTasksData.value = allTasksFromAPI
 
     recentFlows.value = flows.slice(0, 5)
 
-    // Todas las tareas (limitado a 20 para no sobrecargar)
-    allTasks.value = tasks
+    // Tareas del USUARIO para la tabla "Mis Tareas" (limitado a 20 para no sobrecargar)
+    allTasks.value = userTasks
       .filter(t => t.status !== 'completed')
       .slice(0, 20)
 
     // Calcular datos reales para los últimos 7 días
     const last7Days = []
     const completedByDay = []
-    
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       date.setHours(0, 0, 0, 0)
-      
+
       const nextDay = new Date(date)
       nextDay.setDate(nextDay.getDate() + 1)
-      
+
       // Nombre del día
       const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
       last7Days.push(dayNames[date.getDay()])
-      
+
       // Contar tareas completadas ese día
-      const completedCount = tasks.filter(t => {
+      const completedCount = userTasks.filter(t => {
         if (t.status !== 'completed' || !t.updated_at) return false
         const taskDate = new Date(t.updated_at)
         return taskDate >= date && taskDate < nextDay
       }).length
-      
+
       completedByDay.push(completedCount)
     }
-    
+
     taskTrendData.value = {
       labels: last7Days,
       datasets: [{
@@ -673,10 +771,10 @@ const loadData = async () => {
 
     // Actualizar gráficos con datos reales (solo pendientes o en progreso)
     priorityChartData.value.datasets[0].data = [
-      tasks.filter(t => t.priority === 'low' && ['pending', 'in_progress'].includes(t.status)).length,
-      tasks.filter(t => t.priority === 'medium' && ['pending', 'in_progress'].includes(t.status)).length,
-      tasks.filter(t => t.priority === 'high' && ['pending', 'in_progress'].includes(t.status)).length,
-      tasks.filter(t => t.priority === 'urgent' && ['pending', 'in_progress'].includes(t.status)).length
+      userTasks.filter(t => t.priority === 'low' && ['pending', 'in_progress'].includes(t.status)).length,
+      userTasks.filter(t => t.priority === 'medium' && ['pending', 'in_progress'].includes(t.status)).length,
+      userTasks.filter(t => t.priority === 'high' && ['pending', 'in_progress'].includes(t.status)).length,
+      userTasks.filter(t => t.priority === 'urgent' && ['pending', 'in_progress'].includes(t.status)).length
     ]
   } catch (error) {
     console.error('Error cargando datos:', error)
@@ -696,7 +794,42 @@ const isThisWeek = (date) => {
   return d >= weekAgo && d <= today
 }
 
+// Handler para notificaciones en tiempo real que afectan el dashboard
+const handleRealtimeNotification = (data) => {
+  console.log('📬 Notificación recibida en Dashboard:', data)
+
+  // Recargar datos del dashboard cuando llega una notificación relevante
+  const relevantTypes = [
+    'task_assigned',
+    'task_completed',
+    'sla_warning',
+    'task_overdue',
+    'task_date_changed',
+    'task_blocked',
+    'task_unblocked'
+  ]
+
+  if (data.notification && relevantTypes.includes(data.notification.type)) {
+    console.log('🔄 Recargando dashboard por notificación:', data.notification.type)
+    loadData()
+  }
+}
+
+// Configurar WebSocket para auto-recarga
+let realtimeConnection = null
+
 onMounted(() => {
   loadData()
+
+  // Conectar a WebSocket si el usuario está autenticado
+  if (authStore.user?.id) {
+    realtimeConnection = useUserNotifications(authStore.user.id, handleRealtimeNotification)
+  }
+})
+
+onUnmounted(() => {
+  if (realtimeConnection) {
+    realtimeConnection.disconnect()
+  }
 })
 </script>

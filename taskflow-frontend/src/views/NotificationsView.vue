@@ -26,6 +26,13 @@
           >
             No leídas <span v-if="unreadCount > 0" class="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] rounded-full">{{ unreadCount }}</span>
           </button>
+          <button
+            @click="filterType = 'sla'"
+            :class="filterType === 'sla' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-red-700 dark:hover:text-red-400'"
+            class="px-6 py-2 rounded-lg font-bold text-sm transition-all"
+          >
+            🚨 SLA <span v-if="slaCount > 0" class="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full">{{ slaCount }}</span>
+          </button>
         </div>
         
         <button
@@ -136,9 +143,22 @@ const notifications = ref([])
 const unreadCount = ref(0)
 const filterType = ref('all')
 
+const slaNotifications = computed(() => {
+  return notifications.value.filter(n =>
+    ['sla_warning', 'sla_escalation', 'sla_escalation_notice', 'sla_resolved'].includes(n.type)
+  )
+})
+
+const slaCount = computed(() => {
+  return slaNotifications.value.filter(n => !n.is_read).length
+})
+
 const filteredNotifications = computed(() => {
   if (filterType.value === 'unread') {
     return notifications.value.filter(n => !n.is_read)
+  }
+  if (filterType.value === 'sla') {
+    return slaNotifications.value
   }
   return notifications.value
 })

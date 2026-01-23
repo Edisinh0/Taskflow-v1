@@ -288,15 +288,75 @@ class Task extends Model implements Auditable
      */
     public function getSupervisor()
     {
-        // Obtener el creador del flujo como supervisor
+        // Primero intentar obtener el responsable del flujo
+        if ($this->flow && $this->flow->responsible_id) {
+            return User::find($this->flow->responsible_id);
+        }
+
+        // Si no hay responsable, obtener el creador del flujo
         if ($this->flow && $this->flow->created_by) {
             return User::find($this->flow->created_by);
         }
 
-        // Alternativamente, buscar usuarios con rol de admin o project_manager
-        return User::whereHas('roles', function($query) {
-            $query->whereIn('name', ['admin', 'project_manager']);
-        })->first();
+        // Como última opción, buscar un admin o project_manager
+        return User::where('role', 'admin')
+            ->orWhere('role', 'project_manager')
+            ->first();
+    }
+
+    /**
+     * Verificar el estado de alerta SLA
+     * Retorna: 'none' | 'warning' | 'escalation'
+     */
+    public function getSLAStatus(): string
+    {
+        if ($this->status === 'completed' || $this->status === 'cancelled') {
+            return 'none';
+        }
+
+        if (!$this->sla_due_date) {
+            return 'none';
+        }
+
+        $hoursOverdue = now()->diffInHours($this->sla_due_date, false);
+
+        // Si es negativo, aún no ha vencido
+        if ($hoursOverdue < 0) {
+            return 'none';
+        }
+
+        if ($hoursOverdue >= 48) {
+            return 'escalation';
+        }
+
+        if ($hoursOverdue >= 24) {
+            return 'warning';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * Calcular días de atraso (para notificaciones)
+     */
+    public function getDaysOverdue(): int
+    {
+        if (!$this->sla_due_date) {
+            return 0;
+        }
+
+        $daysOverdue = now()->diffInDays($this->sla_due_date, false);
+
+        // Si es negativo, aún no ha vencido
+        return max(0, (int) $daysOverdue);
+    }
+
+    /**
+     * Obtener PM/Supervisor responsable (alias de getSupervisor)
+     */
+    public function getResponsible(): ?User
+    {
+        return $this->getSupervisor();
     }
 
     /**

@@ -128,8 +128,7 @@ class FlowController extends Controller
                     if ($task) {
                         // Forzar refresco por si el observer no corrió o si usamos sistema pivot
                         $task->is_blocked = $task->checkIsBlocked();
-                        if ($task->is_blocked && $task->status !== 'completed' && $task->status !== 'blocked') {
-                            $task->status = 'blocked';
+                        if ($task->is_blocked && $task->status !== 'completed') {
                             $task->blocked_reason = 'Esperando tareas precedentes';
                             $task->saveQuietly();
                         }
