@@ -156,3 +156,14 @@ export function useTaskDateChanges(userId, onDateChange) {
     'TaskDateChanged': onDateChange
   })
 }
+
+/**
+ * Composable para escuchar cambios de estado SLA
+ * @param {number} userId - ID del usuario
+ * @param {function} onSLAStatusChange - Callback cuando cambia el estado SLA
+ */
+export function useSLAStatusChanges(userId, onSLAStatusChange) {
+  return useRealtime(`user.${userId}`, {
+    'SLAStatusChanged': onSLAStatusChange
+  })
+}

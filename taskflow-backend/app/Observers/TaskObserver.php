@@ -26,16 +26,38 @@ class TaskObserver
             $task->last_updated_by = auth()->id();
         }
 
-        // ✅ NUEVO: Auto-asignar sla_due_date desde estimated_end_at si no está definido
-        // Esto asegura que TODAS las tareas con fecha estimada tengan SLA automático
+        // ✅ Auto-sincronizar sla_due_date con estimated_end_at
+        // CASO 1: Creación - Si no hay sla_due_date pero sí estimated_end_at
         if (!$task->sla_due_date && $task->estimated_end_at) {
             $task->sla_due_date = $task->estimated_end_at;
-            Log::info('📅 Auto-asignando sla_due_date desde estimated_end_at', [
+            Log::info('📅 Auto-asignando sla_due_date desde estimated_end_at (creación)', [
                 'task_id' => $task->id ?? 'new',
                 'title' => $task->title ?? 'Sin título',
                 'estimated_end_at' => $task->estimated_end_at,
                 'sla_due_date' => $task->sla_due_date,
             ]);
+        }
+
+        // CASO 2: Actualización - Si cambió estimated_end_at, sincronizar sla_due_date
+        if ($task->exists && $task->estimated_end_at) {
+            // Verificar si cambió usando getOriginal
+            $oldEstimatedEnd = $task->getOriginal('estimated_end_at');
+            $newEstimatedEnd = $task->estimated_end_at;
+
+            // Convertir a string para comparación segura
+            $oldDate = $oldEstimatedEnd ? \Carbon\Carbon::parse($oldEstimatedEnd)->toDateTimeString() : null;
+            $newDate = $newEstimatedEnd ? \Carbon\Carbon::parse($newEstimatedEnd)->toDateTimeString() : null;
+
+            if ($oldDate !== $newDate) {
+                $task->sla_due_date = $task->estimated_end_at;
+                Log::info('🔄 Sincronizando sla_due_date con estimated_end_at (actualización)', [
+                    'task_id' => $task->id,
+                    'title' => $task->title,
+                    'old_estimated_end_at' => $oldDate,
+                    'new_estimated_end_at' => $newDate,
+                    'new_sla_due_date' => $task->sla_due_date,
+                ]);
+            }
         }
 
         // Capture old assignee for updates before returning
@@ -249,7 +271,7 @@ class TaskObserver
             $newAssigneeId = $task->assignee_id;
             $oldAssigneeId = self::$previousAssignees[$task->id] ?? null;
 
-            Log::info('🔄 [UPDATED] Cambio de asignado detectado', [
+            Log::info(' [UPDATED] Cambio de asignado detectado', [
                 'task_id' => $task->id,
                 'old_assignee_id' => $oldAssigneeId,
                 'new_assignee_id' => $newAssigneeId
@@ -279,9 +301,76 @@ class TaskObserver
         // NUEVO: Detectar cambios de fechas
         $this->checkDateChanges($task);
 
+        // NUEVO: Recalcular SLA si cambiaron fechas relevantes
+        $dateFields = ['estimated_end_at', 'sla_due_date', 'estimated_start_at', 'status'];
+
+        $dateChanged = false;
+        foreach ($dateFields as $field) {
+            if ($task->wasChanged($field)) {
+                $dateChanged = true;
+                break;
+            }
+        }
+
+        if ($dateChanged) {
+            Log::info('📅 Fechas o estado cambiaron, recalculando SLA', [
+                'task_id' => $task->id,
+                'title' => $task->title,
+                'sla_due_date' => $task->sla_due_date,
+                'estimated_end_at' => $task->estimated_end_at,
+                'status' => $task->status,
+            ]);
+
+            // Calcular estado ANTERIOR basado en la fecha original
+            $oldSlaDate = $task->getOriginal('sla_due_date');
+            $oldStatus = 'none';
+
+            if ($oldSlaDate && !in_array($task->getOriginal('status'), ['completed', 'cancelled'])) {
+                $now = now();
+                $oldDueDate = \Carbon\Carbon::parse($oldSlaDate);
+
+                if ($now->isAfter($oldDueDate)) {
+                    $hoursOverdue = $now->diffInHours($oldDueDate, false);
+                    if ($hoursOverdue >= 48) {
+                        $oldStatus = 'critical';
+                    } elseif ($hoursOverdue >= 24) {
+                        $oldStatus = 'warning';
+                    }
+                }
+            }
+
+            // Calcular estado NUEVO
+            $newStatus = $task->recalculateSLAStatus();
+
+            Log::info('🔄 Comparando estados SLA', [
+                'task_id' => $task->id,
+                'old_sla_date' => $oldSlaDate,
+                'new_sla_date' => $task->sla_due_date,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+
+            // SIEMPRE disparar evento si hubo cambio de fecha, incluso si status es igual
+            // Esto asegura que el frontend se actualice
+            if ($oldStatus !== $newStatus || $task->wasChanged('sla_due_date') || $task->wasChanged('estimated_end_at')) {
+                Log::info('🚨 Disparando evento SLAStatusChanged', [
+                    'task_id' => $task->id,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                    'reason' => $oldStatus !== $newStatus ? 'status_changed' : 'date_changed',
+                ]);
+
+                event(new \App\Events\SLAStatusChanged($task, $oldStatus, $newStatus));
+            }
+
+            // Limpiar alertas antiguas si ya no hay retraso
+            $slaService = app(\App\Services\SLAService::class);
+            $slaService->clearStaleAlerts($task);
+        }
+
         // 1. Solo actuamos si el estado cambió A 'completed'
         if ($task->isDirty('status') && $task->status === 'completed') {
-            Log::info('✅ Tarea completada, liberando dependientes', [
+            Log::info(' Tarea completada, liberando dependientes', [
                 'task_id' => $task->id,
                 'title' => $task->title,
             ]);
@@ -301,19 +390,19 @@ class TaskObserver
 
             // 2. Buscar tareas que dependían de esta (como tarea precedente)
             $taskDependents = Task::where('depends_on_task_id', $task->id)->get();
-            Log::info("📊 Encontradas {$taskDependents->count()} tareas dependientes (depends_on_task_id)");
+            Log::info(" Encontradas {$taskDependents->count()} tareas dependientes (depends_on_task_id)");
 
             foreach ($taskDependents as $dependent) {
-                Log::info("🔍 Procesando tarea dependiente {$dependent->id}: {$dependent->title}");
+                Log::info(" Procesando tarea dependiente {$dependent->id}: {$dependent->title}");
                 $this->checkAndUnlock($dependent);
             }
 
             // 3. Buscar tareas que dependían de esta (como milestone)
             $milestoneDependents = Task::where('depends_on_milestone_id', $task->id)->get();
-            Log::info("📊 Encontradas {$milestoneDependents->count()} tareas dependientes (depends_on_milestone_id)");
+            Log::info(" Encontradas {$milestoneDependents->count()} tareas dependientes (depends_on_milestone_id)");
 
             foreach ($milestoneDependents as $dependent) {
-                Log::info("🔍 Procesando tarea dependiente de milestone: {$dependent->id}");
+                Log::info(" Procesando tarea dependiente de milestone: {$dependent->id}");
                 $this->checkAndUnlock($dependent);
             }
         }
@@ -323,7 +412,7 @@ class TaskObserver
             $task->status !== 'completed' && 
             $task->getOriginal('status') === 'completed') {
             
-            Log::warning("⚠️ Tarea {$task->id} reabierta. Re-bloqueando dependientes.");
+            Log::warning(" Tarea {$task->id} reabierta. Re-bloqueando dependientes.");
             
             // Re-bloquear las tareas que dependían de esta
             Task::where('depends_on_task_id', $task->id)
@@ -409,10 +498,10 @@ class TaskObserver
 
             $flow->saveQuietly();
 
-            Log::info("📊 Progreso del flujo actualizado (basado en root tasks): {$flow->id} -> {$avgProgress}% ({$flow->status})");
+            Log::info(" Progreso del flujo actualizado (basado en root tasks): {$flow->id} -> {$avgProgress}% ({$flow->status})");
 
         } catch (\Exception $e) {
-            Log::error("❌ Error actualizando progreso del flujo {$task->flow_id}: " . $e->getMessage());
+            Log::error(" Error actualizando progreso del flujo {$task->flow_id}: " . $e->getMessage());
         }
     }
 
@@ -463,11 +552,11 @@ class TaskObserver
                 }
                 
                 $parent->saveQuietly();
-                Log::info("📊 Progreso del Milestone actualizado: {$parent->id} -> {$newProgress}% ({$parent->status})");
+                Log::info(" Progreso del Milestone actualizado: {$parent->id} -> {$newProgress}% ({$parent->status})");
             }
             
         } catch (\Exception $e) {
-            Log::error("❌ Error actualizando progreso del padre {$task->parent_task_id}: " . $e->getMessage());
+            Log::error(" Error actualizando progreso del padre {$task->parent_task_id}: " . $e->getMessage());
         }
     }
 
@@ -486,7 +575,7 @@ class TaskObserver
             $parentTask = Task::find($task->depends_on_task_id);
             if ($parentTask && $parentTask->status !== 'completed') {
                 $canUnlock = false;
-                Log::info("⏸️ Tarea {$task->id} sigue bloqueada por tarea precedente {$parentTask->id}");
+                Log::info("⏸ Tarea {$task->id} sigue bloqueada por tarea precedente {$parentTask->id}");
             }
         }
         
@@ -495,7 +584,7 @@ class TaskObserver
             $milestoneTask = Task::find($task->depends_on_milestone_id);
             if ($milestoneTask && $milestoneTask->status !== 'completed') {
                 $canUnlock = false;
-                Log::info("⏸️ Tarea {$task->id} sigue bloqueada por milestone {$milestoneTask->id}");
+                Log::info("⏸ Tarea {$task->id} sigue bloqueada por milestone {$milestoneTask->id}");
             }
         }
         
@@ -508,17 +597,17 @@ class TaskObserver
             if ($task->status === 'blocked') {
                 $updateData['status'] = 'pending';
                 $updateData['blocked_reason'] = null;
-                Log::info("🔓 Tarea {$task->id} cambiada de 'blocked' a 'pending'");
+                Log::info(" Tarea {$task->id} cambiada de 'blocked' a 'pending'");
             }
 
             // Si es una subtarea (tiene parent_task_id) y está en pending, cambiarla a in_progress
             if ($task->parent_task_id && $task->status === 'pending') {
                 $updateData['status'] = 'in_progress';
-                Log::info("🚀 Subtarea {$task->id} cambiada a 'in_progress' automáticamente");
+                Log::info(" Subtarea {$task->id} cambiada a 'in_progress' automáticamente");
             }
 
             $task->update($updateData);
-            Log::info("🔓 Tarea {$task->id} desbloqueada completamente.", $updateData);
+            Log::info(" Tarea {$task->id} desbloqueada completamente.", $updateData);
         }
     }
 
@@ -528,7 +617,7 @@ class TaskObserver
      */
     private function resolveSLAAlerts(Task $task): void
     {
-        Log::info('🔔 Resolviendo alertas SLA para tarea completada', [
+        Log::info(' Resolviendo alertas SLA para tarea completada', [
             'task_id' => $task->id,
             'title' => $task->title,
         ]);
@@ -552,7 +641,7 @@ class TaskObserver
         }
 
         if ($resolvedCount > 0) {
-            Log::info("✅ {$resolvedCount} alertas SLA resueltas automáticamente para tarea {$task->id}");
+            Log::info(" {$resolvedCount} alertas SLA resueltas automáticamente para tarea {$task->id}");
 
             // Crear notificación de resolución para el asignado
             if ($task->assignee_id) {
@@ -561,7 +650,7 @@ class TaskObserver
                     'task_id' => $task->id,
                     'flow_id' => $task->flow_id,
                     'type' => 'sla_resolved',
-                    'title' => '✅ SLA Resuelto',
+                    'title' => ' SLA Resuelto',
                     'message' => "La tarea '{$task->title}' fue completada exitosamente.",
                     'priority' => 'low',
                     'data' => [
@@ -586,7 +675,7 @@ class TaskObserver
                             'task_id' => $task->id,
                             'flow_id' => $task->flow_id,
                             'type' => 'sla_resolved',
-                            'title' => '✅ SLA Escalado Resuelto',
+                            'title' => ' SLA Escalado Resuelto',
                             'message' => "La tarea escalada '{$task->title}' fue completada por {$task->assignee->name}.",
                             'priority' => 'low',
                             'data' => [
@@ -699,7 +788,7 @@ class TaskObserver
         // Broadcast en tiempo real
         broadcast(new \App\Events\NotificationSent($notification))->toOthers();
 
-        Log::info('✅ Notificación de cambio de fecha creada', [
+        Log::info(' Notificación de cambio de fecha creada', [
             'notification_id' => $notification->id,
             'type' => 'task_date_changed',
             'priority' => $priority,

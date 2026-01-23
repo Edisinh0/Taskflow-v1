@@ -291,6 +291,9 @@ class TaskController extends Controller
 
         $task->update($validated);
 
+        // Refrescar desde BD para obtener valores actualizados por triggers
+        $task->refresh();
+
         \Log::info('🎯 TaskController::update() - DESPUÉS de actualizar', [
             'task_id' => $task->id,
             'current_assignee_id' => $task->assignee_id
@@ -310,6 +313,60 @@ class TaskController extends Controller
         // Disparar evento en tiempo real
         if (!empty($changes)) {
             broadcast(new TaskUpdated($task, $changes))->toOthers();
+        }
+
+        // 🚨 VERIFICAR SI CAMBIÓ EL ESTADO SLA (fechas o estado de tarea)
+        $dateChanged = isset($changes['estimated_end_at']) ||
+                       isset($changes['estimated_start_at']) ||
+                       isset($changes['status']);
+
+        if ($dateChanged) {
+            \Log::info('📅 Fecha o estado cambió, verificando SLA', [
+                'task_id' => $task->id,
+                'changes' => array_keys($changes)
+            ]);
+
+            // Calcular estado SLA ANTERIOR
+            $oldStatus = 'none';
+            if (isset($originalAttributes['sla_due_date']) &&
+                !in_array($originalAttributes['status'] ?? 'pending', ['completed', 'cancelled'])) {
+
+                $oldDueDate = \Carbon\Carbon::parse($originalAttributes['sla_due_date']);
+                $now = now();
+
+                if ($now->isAfter($oldDueDate)) {
+                    $hoursOverdue = $now->diffInHours($oldDueDate, false);
+                    if ($hoursOverdue >= 48) {
+                        $oldStatus = 'critical';
+                    } elseif ($hoursOverdue >= 24) {
+                        $oldStatus = 'warning';
+                    }
+                }
+            }
+
+            // Calcular estado SLA NUEVO (refresh ya hizo la consulta)
+            $newStatus = $task->recalculateSLAStatus();
+
+            \Log::info('🔄 Comparando estados SLA en Controller', [
+                'task_id' => $task->id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]);
+
+            // Disparar evento si cambió el estado SLA
+            if ($oldStatus !== $newStatus) {
+                \Log::info('🚨 Disparando evento SLAStatusChanged desde Controller', [
+                    'task_id' => $task->id,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ]);
+
+                event(new \App\Events\SLAStatusChanged($task, $oldStatus, $newStatus));
+
+                // Limpiar alertas obsoletas
+                $slaService = app(\App\Services\SLAService::class);
+                $slaService->clearStaleAlerts($task);
+            }
         }
 
         return response()->json([

@@ -344,7 +344,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useUserNotifications } from '@/composables/useRealtime'
+import { useUserNotifications, useSLAStatusChanges } from '@/composables/useRealtime'
 import { flowsAPI, tasksAPI } from '@/services/api'
 import { Line, Doughnut } from 'vue-chartjs'
 import {
@@ -815,8 +815,44 @@ const handleRealtimeNotification = (data) => {
   }
 }
 
+// Handler para cambios de estado SLA
+const handleSLAStatusChange = (data) => {
+  console.log('🚨 Estado SLA cambió en Dashboard:', data)
+  console.log('📊 Detalles:', {
+    task_id: data.task_id,
+    task_title: data.task_title,
+    old_status: data.old_status,
+    new_status: data.new_status,
+    message: data.message
+  })
+
+  // Actualizar la tarea específica en allTasksData si existe
+  const taskIndex = allTasksData.value.findIndex(t => t.id === data.task_id)
+  if (taskIndex !== -1) {
+    console.log('✅ Actualizando tarea en allTasksData:', data.task_id)
+
+    // Actualizar fechas si vienen en el evento
+    if (data.sla_due_date) {
+      allTasksData.value[taskIndex].sla_due_date = data.sla_due_date
+    }
+    if (data.estimated_end_at) {
+      allTasksData.value[taskIndex].estimated_end_at = data.estimated_end_at
+    }
+
+    // Forzar re-render actualizando el array
+    allTasksData.value = [...allTasksData.value]
+
+    console.log('🔄 Tarea actualizada, computedUrgentTasks se recalculará automáticamente')
+  }
+
+  // También recargar todos los datos para mantener sincronización completa
+  console.log('🔄 Recargando dashboard completo por cambio de estado SLA')
+  loadData()
+}
+
 // Configurar WebSocket para auto-recarga
 let realtimeConnection = null
+let slaStatusConnection = null
 
 onMounted(() => {
   loadData()
@@ -824,12 +860,16 @@ onMounted(() => {
   // Conectar a WebSocket si el usuario está autenticado
   if (authStore.user?.id) {
     realtimeConnection = useUserNotifications(authStore.user.id, handleRealtimeNotification)
+    slaStatusConnection = useSLAStatusChanges(authStore.user.id, handleSLAStatusChange)
   }
 })
 
 onUnmounted(() => {
   if (realtimeConnection) {
     realtimeConnection.disconnect()
+  }
+  if (slaStatusConnection) {
+    slaStatusConnection.disconnect()
   }
 })
 </script>

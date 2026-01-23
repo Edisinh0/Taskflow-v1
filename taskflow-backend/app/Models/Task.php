@@ -284,6 +284,46 @@ class Task extends Model implements Auditable
     }
 
     /**
+     * Recalcular estado actual de SLA
+     * Retorna: 'none', 'warning', 'critical'
+     */
+    public function recalculateSLAStatus(): string
+    {
+        // Si está completada o cancelada, no hay alerta
+        if (in_array($this->status, ['completed', 'cancelled'])) {
+            return 'none';
+        }
+
+        // Si no hay fecha de SLA, no hay alerta
+        if (!$this->sla_due_date) {
+            return 'none';
+        }
+
+        $now = now();
+        $dueDate = \Carbon\Carbon::parse($this->sla_due_date);
+
+        // Si la fecha límite es futura, no hay alerta
+        if ($now->isBefore($dueDate)) {
+            return 'none';
+        }
+
+        // Calcular horas de retraso
+        $hoursOverdue = $now->diffInHours($dueDate, false);
+
+        // Critical: 48+ horas de retraso
+        if ($hoursOverdue >= 48) {
+            return 'critical';
+        }
+
+        // Warning: 24+ horas de retraso
+        if ($hoursOverdue >= 24) {
+            return 'warning';
+        }
+
+        return 'none';
+    }
+
+    /**
      * Obtener el supervisor/PM del flujo para escalamiento
      */
     public function getSupervisor()
